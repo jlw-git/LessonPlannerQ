@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   BookOpen,
+  CalendarDays,
   ChevronDown,
   CheckCircle2,
   FileText,
@@ -8,8 +9,13 @@ import {
   Loader2,
   MessageCircle,
   Mic,
+  NotebookPen,
+  Pencil,
   PlayCircle,
+  Save,
   Target,
+  Trash2,
+  X,
   Wand2
 } from "lucide-react";
 import type { LessonBrief, LessonOption, LessonOptionsResponse, LessonPlan, Rehearsal, VisualPack } from "./types";
@@ -27,6 +33,21 @@ type TranscriptEntry = {
   text: string;
 };
 
+type LessonReflection = {
+  id: string;
+  date: string;
+  topic: string;
+  lessonPlan: string;
+  workedWell: string;
+  didNotWork: string;
+  studentResponse: string;
+  nextTime: string;
+};
+
+type ReflectionDraft = Omit<LessonReflection, "id">;
+
+const reflectionStorageKey = "lesson-planner-q-reflections";
+
 const initialForm: FormState = {
   topic: "Compassion in daily life",
   outcome: "Students can notice suffering in everyday situations and choose one compassionate response.",
@@ -34,17 +55,69 @@ const initialForm: FormState = {
   voiceNotes: "Next week I want to teach compassion, but my students are restless and I want an activity."
 };
 
+function todayString() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - offset * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+const initialReflectionDraft: ReflectionDraft = {
+  date: todayString(),
+  topic: initialForm.topic,
+  lessonPlan: "",
+  workedWell: "",
+  didNotWork: "",
+  studentResponse: "",
+  nextTime: ""
+};
+
+function loadReflections() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const saved = window.localStorage.getItem(reflectionStorageKey);
+    if (!saved) {
+      return [];
+    }
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? (parsed as LessonReflection[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 async function postJson<T>(url: string, body: unknown): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
-  const data = await response.json();
+  const data = await readJsonResponse<{ error?: string } & T>(response, "Request failed");
   if (!response.ok) {
     throw new Error(data.error || "Request failed");
   }
   return data as T;
+}
+
+async function readJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
+  const text = await response.text();
+
+  if (!text) {
+    if (!response.ok) {
+      throw new Error(fallbackMessage);
+    }
+    return {} as T;
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    const preview = text.replace(/\s+/g, " ").trim().slice(0, 180);
+    throw new Error(preview || fallbackMessage);
+  }
 }
 
 function List({ items }: { items: string[] }) {
@@ -107,6 +180,10 @@ export default function App() {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showTypedBrief, setShowTypedBrief] = useState(false);
+  const [showLessonMemory, setShowLessonMemory] = useState(false);
+  const [reflectionDraft, setReflectionDraft] = useState<ReflectionDraft>(initialReflectionDraft);
+  const [reflections, setReflections] = useState<LessonReflection[]>(loadReflections);
+  const [editingReflectionId, setEditingReflectionId] = useState<string | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"idle" | "connecting" | "live">("idle");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const realtimePeer = useRef<RTCPeerConnection | null>(null);
@@ -126,13 +203,88 @@ export default function App() {
       teachingStyle: "Play-based learning and scaffolded self-directed learning",
       requiredScaffold: "Gradual release of responsibility: I do, We do, You do",
       selectedOption: selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex],
+      lessonMemory: reflections.slice(0, 5).map((reflection) => ({
+        date: reflection.date,
+        topic: reflection.topic,
+        lessonPlan: reflection.lessonPlan,
+        workedWell: reflection.workedWell,
+        didNotWork: reflection.didNotWork,
+        studentResponse: reflection.studentResponse,
+        nextTime: reflection.nextTime
+      })),
+      lessonMemoryInstruction:
+        reflections.length > 0
+          ? "Use lessonMemory as prior classroom evidence. Carry forward what worked, avoid or adapt what did not, and explicitly consider nextTime notes when drafting options, briefs, visuals, rehearsal, and the full lesson."
+          : "No prior lesson memory has been logged yet.",
       safety: "Educator-facing draft. No unsupervised student-agent interaction."
     }),
-    [form, lessonOptions, selectedOptionIndex]
+    [form, lessonOptions, reflections, selectedOptionIndex]
   );
 
   const update = (field: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateReflectionDraft = (field: keyof ReflectionDraft, value: string) => {
+    setReflectionDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const persistReflections = (nextReflections: LessonReflection[]) => {
+    setReflections(nextReflections);
+    window.localStorage.setItem(reflectionStorageKey, JSON.stringify(nextReflections));
+  };
+
+  const resetReflectionDraft = () => {
+    setReflectionDraft({
+      date: todayString(),
+      topic: form.topic,
+      lessonPlan: lesson?.title || brief?.title || "",
+      workedWell: "",
+      didNotWork: "",
+      studentResponse: "",
+      nextTime: ""
+    });
+    setEditingReflectionId(null);
+  };
+
+  const saveReflection = () => {
+    if (
+      !reflectionDraft.topic.trim() ||
+      (!reflectionDraft.lessonPlan.trim() &&
+        !reflectionDraft.workedWell.trim() &&
+        !reflectionDraft.didNotWork.trim() &&
+        !reflectionDraft.studentResponse.trim() &&
+        !reflectionDraft.nextTime.trim())
+    ) {
+      return;
+    }
+
+    if (editingReflectionId) {
+      persistReflections(
+        reflections.map((reflection) =>
+          reflection.id === editingReflectionId ? { ...reflectionDraft, id: editingReflectionId } : reflection
+        )
+      );
+      resetReflectionDraft();
+      return;
+    }
+
+    persistReflections([{ ...reflectionDraft, id: crypto.randomUUID() }, ...reflections].slice(0, 20));
+    resetReflectionDraft();
+  };
+
+  const editReflection = (reflection: LessonReflection) => {
+    const { id: _id, ...draft } = reflection;
+    setReflectionDraft(draft);
+    setEditingReflectionId(reflection.id);
+    setShowLessonMemory(true);
+  };
+
+  const deleteReflection = (id: string) => {
+    persistReflections(reflections.filter((reflection) => reflection.id !== id));
+    if (editingReflectionId === id) {
+      resetReflectionDraft();
+    }
   };
 
   const run = async <T,>(
@@ -327,7 +479,7 @@ export default function App() {
     setTranscript([]);
     addTranscript({
       role: "planner",
-      text: "Starting voice interview. Allow microphone access if your browser asks."
+      text: "Starting voice planning. Allow microphone access if your browser asks."
     });
     try {
       const tokenResponse = await fetch("/api/realtime/client-secret", {
@@ -335,7 +487,12 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ context: requestPayload })
       });
-      const tokenData = await tokenResponse.json();
+      const tokenData = await readJsonResponse<{
+        error?: string;
+        value?: string;
+        client_secret?: { value?: string };
+        session?: { client_secret?: { value?: string } };
+      }>(tokenResponse, "Could not start realtime session");
       if (!tokenResponse.ok) {
         throw new Error(tokenData.error || "Could not start realtime session");
       }
@@ -421,31 +578,45 @@ export default function App() {
           <p className="eyebrow">Lesson Planner Q</p>
           <h1>Weekly Lesson Planner</h1>
           <p className="lede">
-            Generate structured lesson plans, rehearse tricky explanations, and prepare printable visual materials for a
-            small class of 13-year-old students.
+            Generate lesson plans, rehearse tricky explanations, and log reflections after each lesson to improve future
+            lessons.
           </p>
         </div>
       </header>
 
       <div className="workspace">
         {realtimeStatus === "idle" && (
-        <section className="brief-composer" aria-label="Lesson input">
+        <section className="brief-composer feature-section" aria-label="Generate lesson plan">
+          <div className="composer-head">
+            <div className="section-title">
+              <FileText size={22} />
+              <h2>Generate lesson plan</h2>
+            </div>
+            <p>Plan your lesson by talking it through with PlannerQ, or typing your thoughts out.</p>
+          </div>
+
           <section className="voice-first">
-            <span className="voice-orb">
-              <Mic size={26} />
-            </span>
-            <div>
-              <h2>Start by voice</h2>
-              <p>Talk through the lesson idea, class context, and what you want students to take away.</p>
+            <div className="voice-copy">
+              <div className="section-title voice-title">
+                <Mic size={22} />
+                <h3>Talk it through</h3>
+              </div>
+              <p>Speak naturally about the lesson idea, class context, and what you want students to take away.</p>
             </div>
             <button onClick={startRealtime} className="voice-primary">
               <Mic size={18} />
-              Start voice interview
+              Talk with PlannerQ
             </button>
           </section>
 
           <button className="typed-toggle compact-toggle" onClick={() => setShowTypedBrief((current) => !current)}>
-            <span>Type brief instead</span>
+            <span className="typed-toggle-copy">
+              <span>
+                <FileText size={18} />
+                Type your thoughts
+              </span>
+              <small>Write the lesson idea, class context, and student takeaway.</small>
+            </span>
             <ChevronDown className={showTypedBrief ? "rotate" : ""} size={18} />
           </button>
 
@@ -485,7 +656,7 @@ export default function App() {
               <div className="typed-actions">
                 <button onClick={generateOptions} disabled={Boolean(loading)}>
                   {loading === "options" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                  Review lesson options
+                  See lesson options
                 </button>
               </div>
             </div>
@@ -496,16 +667,16 @@ export default function App() {
         {realtimeStatus !== "idle" && (
           <section className="voice-stage" aria-live="polite">
             <div className="voice-stage-top">
-              <span>Voice interview</span>
+              <span>Planning chat</span>
               <strong>{realtimeStatus === "connecting" ? "Connecting" : "Live"}</strong>
             </div>
             <div className="voice-stage-center">
-              <button onClick={startRealtime} className="stage-mic" aria-label="Stop voice interview">
+              <button onClick={startRealtime} className="stage-mic" aria-label="End voice planning">
                 <Mic size={42} />
               </button>
-              <p>{realtimeStatus === "connecting" ? "Connecting to the lesson planner..." : "Planner is listening"}</p>
+              <p>{realtimeStatus === "connecting" ? "Connecting to PlannerQ..." : "PlannerQ is listening"}</p>
               <button onClick={stopRealtime} className="end-session">
-                End session
+                End chat
               </button>
             </div>
             <aside className="transcript-drawer">
@@ -523,13 +694,188 @@ export default function App() {
         )}
 
         <div className="content" ref={outputRef}>
+          {realtimeStatus === "idle" && brief && (
+            <section className="panel rehearsal-entry-panel feature-section">
+              <div className="memory-header">
+                <div className="section-title">
+                  <Mic size={22} />
+                  <h2>Rehearse tricky explanations</h2>
+                </div>
+                <span>Ready</span>
+              </div>
+              <p className="muted">
+                Practice likely student questions, simplify abstract ideas, and tighten your wording before class.
+              </p>
+              <button onClick={generateRehearsal} disabled={Boolean(loading)} className="memory-toggle">
+                {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
+                Practice with coach
+              </button>
+            </section>
+          )}
+
+          {realtimeStatus === "idle" && (
+            <section className="panel memory-panel">
+              <div className="memory-header">
+                <div className="section-title">
+                  <NotebookPen size={22} />
+                  <h2>Log lesson reflections</h2>
+                </div>
+                <span>{reflections.length} saved</span>
+              </div>
+              <p className="muted">
+                Saved in this browser for now. Review, edit, or delete past reflections here; recent reflections improve
+                future lesson plans.
+              </p>
+
+              <button className="typed-toggle memory-toggle" onClick={() => setShowLessonMemory((current) => !current)}>
+                <span>
+                  {showLessonMemory
+                    ? editingReflectionId
+                      ? "Hide edit form"
+                      : "Hide reflection form"
+                    : "Add reflection"}
+                </span>
+                <ChevronDown className={showLessonMemory ? "rotate" : ""} size={18} />
+              </button>
+
+              {showLessonMemory && (
+                <div className="reflection-composer">
+                  {editingReflectionId && (
+                    <div className="edit-banner">
+                      <span>Editing saved reflection</span>
+                      <button className="quiet-button" onClick={resetReflectionDraft}>
+                        <X size={16} />
+                        Cancel edit
+                      </button>
+                    </div>
+                  )}
+                  <div className="field-grid">
+                    <label>
+                      <CalendarDays size={16} />
+                      Lesson date
+                      <input
+                        type="date"
+                        value={reflectionDraft.date}
+                        onChange={(event) => updateReflectionDraft("date", event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <BookOpen size={16} />
+                      Lesson topic
+                      <input
+                        value={reflectionDraft.topic}
+                        onChange={(event) => updateReflectionDraft("topic", event.target.value)}
+                      />
+                    </label>
+                  </div>
+
+                  <label>
+                    <FileText size={16} />
+                    Lesson plan used
+                    <textarea
+                      value={reflectionDraft.lessonPlan}
+                      onChange={(event) => updateReflectionDraft("lessonPlan", event.target.value)}
+                      rows={3}
+                      placeholder="Name the plan, activity flow, or teaching approach that was actually used."
+                    />
+                  </label>
+
+                  <div className="two-col">
+                    <label>
+                      <CheckCircle2 size={16} />
+                      What worked well
+                      <textarea
+                        value={reflectionDraft.workedWell}
+                        onChange={(event) => updateReflectionDraft("workedWell", event.target.value)}
+                        rows={4}
+                        placeholder="Example: Role-play helped the students connect compassion to school conflict."
+                      />
+                    </label>
+                    <label>
+                      <MessageCircle size={16} />
+                      What did not work
+                      <textarea
+                        value={reflectionDraft.didNotWork}
+                        onChange={(event) => updateReflectionDraft("didNotWork", event.target.value)}
+                        rows={4}
+                        placeholder="Example: The story introduction was too long and students got restless."
+                      />
+                    </label>
+                  </div>
+
+                  <div className="two-col">
+                    <label>
+                      <Target size={16} />
+                      Student response
+                      <textarea
+                        value={reflectionDraft.studentResponse}
+                        onChange={(event) => updateReflectionDraft("studentResponse", event.target.value)}
+                        rows={4}
+                        placeholder="What did students understand, resist, enjoy, or ask about?"
+                      />
+                    </label>
+                    <label>
+                      <Wand2 size={16} />
+                      Next time
+                      <textarea
+                        value={reflectionDraft.nextTime}
+                        onChange={(event) => updateReflectionDraft("nextTime", event.target.value)}
+                        rows={4}
+                        placeholder="What should the next lesson repeat, avoid, deepen, or follow up on?"
+                      />
+                    </label>
+                  </div>
+
+                  <button onClick={saveReflection} className="primary" disabled={!reflectionDraft.topic.trim()}>
+                    <Save size={18} />
+                    {editingReflectionId ? "Update reflection" : "Save reflection"}
+                  </button>
+                </div>
+              )}
+
+              {reflections.length > 0 && (
+                <div className="reflection-list">
+                  <h3>Saved reflections</h3>
+                  {reflections.map((reflection) => (
+                    <article key={reflection.id}>
+                      <div>
+                        <span>{reflection.date}</span>
+                        <strong>{reflection.topic}</strong>
+                      </div>
+                      <p>
+                        {[reflection.lessonPlan, reflection.workedWell, reflection.didNotWork, reflection.nextTime]
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .join(" ")}
+                      </p>
+                      <div className="reflection-actions">
+                        <button className="quiet-button" onClick={() => editReflection(reflection)}>
+                          <Pencil size={16} />
+                          Edit
+                        </button>
+                        <button
+                          aria-label={`Delete reflection for ${reflection.topic}`}
+                          className="quiet-button danger-button"
+                          onClick={() => deleteReflection(reflection.id)}
+                        >
+                          <Trash2 size={16} />
+                          Delete
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {error && <div className="error">{error}</div>}
 
           {loading === "options" && (
             <section className="panel drafting-state" aria-live="polite">
               <div className="section-title">
                 <Loader2 className="spin" size={22} />
-                <h2>Generating lesson options</h2>
+                <h2>Preparing lesson options</h2>
               </div>
               <p>Creating distinct ways to run the 90-minute lesson so you can compare before choosing.</p>
               <div className="draft-preview" aria-hidden="true">
@@ -545,10 +891,10 @@ export default function App() {
             <section className="panel drafting-state" aria-live="polite">
               <div className="section-title">
                 <Loader2 className="spin" size={22} />
-                <h2>{loading === "brief-update" ? "Updating the lesson brief" : "Generating the lesson brief"}</h2>
+                <h2>{loading === "brief-update" ? "Updating lesson brief" : "Drafting lesson brief"}</h2>
               </div>
               <p>
-                Turning the voice interview into a structured brief, clarifying questions, and recommended next steps.
+                Turning the planning chat into a structured brief, clarifying questions, and recommended next steps.
               </p>
               <div className="draft-preview" aria-hidden="true">
                 <span />
@@ -563,7 +909,7 @@ export default function App() {
             <section className="panel drafting-state" aria-live="polite">
               <div className="section-title">
                 <Loader2 className="spin" size={22} />
-                <h2>Drafting the 90-minute lesson plan</h2>
+                <h2>Drafting 90-minute lesson plan</h2>
               </div>
               <p>
                 Building the teaching anchor, play activity, self-directed scaffold, reflection prompts, and educator
@@ -579,8 +925,8 @@ export default function App() {
           )}
 
           {lessonOptions.length > 0 && (
-            <Section title="Choose a lesson approach" icon={<FileText size={22} />}>
-              <p className="muted">Scan the options, select one, then review the details before generating the brief.</p>
+            <Section title="Choose lesson approach" icon={<FileText size={22} />}>
+              <p className="muted">Compare the options, then choose one to turn into a lesson brief.</p>
               <div className="option-picker">
                 {lessonOptions.map((option, index) => {
                   const isSelected = selectedOptionIndex === index;
@@ -613,7 +959,7 @@ export default function App() {
                           onClick={() => setExpandedOptionIndex(isExpanded ? null : index)}
                         >
                           <ChevronDown className={isExpanded ? "rotate" : ""} size={18} />
-                          {isExpanded ? "Hide plan" : "Read plan"}
+                          {isExpanded ? "Collapse" : "Read more"}
                         </button>
                       </div>
 
@@ -646,7 +992,7 @@ export default function App() {
                           {isSelected && (
                             <button onClick={generateBrief} disabled={Boolean(loading)}>
                               {loading === "brief" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                              Generate brief from selected option
+                              Draft lesson brief
                             </button>
                           )}
                         </div>
@@ -673,21 +1019,21 @@ export default function App() {
                   <li className={visuals ? "done" : "active"}>
                     <span className="step-number">2</span>
                     <span>
-                      <strong>{brief.visualPackRecommended ? "Generate visual pack" : "Visual pack is optional"}</strong>
+                      <strong>{brief.visualPackRecommended ? "Create visual pack" : "Visual pack is optional"}</strong>
                       <small>Appears below this brief when generated.</small>
                     </span>
                   </li>
                   <li className={rehearsal ? "done" : ""}>
                     <span className="step-number">3</span>
                     <span>
-                      <strong>Practise with rehearsal coach</strong>
+                      <strong>Practice with rehearsal coach</strong>
                       <small>Use feedback from practice to update the brief.</small>
                     </span>
                   </li>
                   <li className={lesson ? "done" : ""}>
                     <span className="step-number">4</span>
                     <span>
-                      <strong>Generate full lesson plan</strong>
+                      <strong>Draft full lesson plan</strong>
                       <small>Use the revised brief as the source of truth.</small>
                     </span>
                   </li>
@@ -697,22 +1043,22 @@ export default function App() {
               <p>{brief.briefSummary}</p>
               <div className="two-col">
                 <div>
-                  <h3>Student Takeaway</h3>
+                  <h3>Student takeaway</h3>
                   <p>{brief.studentTakeaway}</p>
                 </div>
                 <div>
-                  <h3>Clarifying Questions</h3>
+                  <h3>Clarifying questions</h3>
                   <List items={brief.clarifyingQuestions} />
                 </div>
               </div>
 
               <div className="two-col">
                 <div>
-                  <h3>Key Choices</h3>
+                  <h3>Key choices</h3>
                   <List items={brief.keyChoices} />
                 </div>
                 <div>
-                  <h3>Suggested Structure</h3>
+                  <h3>Suggested structure</h3>
                   <List items={brief.suggestedStructure} />
                 </div>
               </div>
@@ -723,7 +1069,7 @@ export default function App() {
                   <p>{brief.visualPackRationale}</p>
                   <button onClick={generateVisuals} disabled={Boolean(loading)}>
                     {loading === "visuals" ? <Loader2 className="spin" size={18} /> : <Image size={18} />}
-                    Generate visual pack
+                    Create visual pack
                   </button>
                 </article>
                 <article>
@@ -741,7 +1087,7 @@ export default function App() {
                   <section className="drafting-state inline-draft" aria-live="polite">
                     <div className="section-title">
                       <Loader2 className="spin" size={20} />
-                      <h3>Generating visual pack</h3>
+                      <h3>Creating visual pack</h3>
                     </div>
                     <p>Creating story cards, scenario cards, storyboard panels, and worksheet prompts for this brief.</p>
                     <div className="draft-preview" aria-hidden="true">
@@ -763,7 +1109,7 @@ export default function App() {
                       <p>{visuals.imagePrompt}</p>
                       <button onClick={generateImage} disabled={Boolean(loading)}>
                         {loading === "image" ? <Loader2 className="spin" size={18} /> : <PlayCircle size={18} />}
-                        Generate image
+                        Create image
                       </button>
                     </div>
                     {generatedImage && (
@@ -773,15 +1119,15 @@ export default function App() {
                     )}
                     <div className="two-col">
                       <div>
-                        <h3>Scenario Cards</h3>
+                        <h3>Scenario cards</h3>
                         <List items={visuals.scenarioCards} />
                       </div>
                       <div>
-                        <h3>Value Cards</h3>
+                        <h3>Value cards</h3>
                         <List items={visuals.valueCards} />
                       </div>
                     </div>
-                    <h3>Storyboard Panels</h3>
+                    <h3>Storyboard panels</h3>
                     <div className="cards-grid">
                       {visuals.storyboardPanels.map((panel, index) => (
                         <article key={`${panel.panel}-${index}`}>
@@ -791,14 +1137,14 @@ export default function App() {
                         </article>
                       ))}
                     </div>
-                    <h3>Worksheet Prompts</h3>
+                    <h3>Worksheet prompts</h3>
                     <List items={visuals.worksheetPrompts} />
                   </section>
                 )}
               </div>
 
               <label className="feedback-box">
-                Educator feedback and changes
+                Feedback and changes
                 <textarea
                   value={feedback}
                   onChange={(event) => setFeedback(event.target.value)}
@@ -810,11 +1156,11 @@ export default function App() {
               <div className="inline-actions">
                 <button onClick={updateBrief} disabled={Boolean(loading) || !feedback.trim()}>
                   {loading === "brief-update" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                  Update brief
+                  Update lesson brief
                 </button>
                 <button onClick={generateLesson} disabled={Boolean(loading)}>
                   {loading === "lesson" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
-                  Generate full lesson plan
+                  Draft full lesson plan
                 </button>
               </div>
             </Section>
@@ -827,16 +1173,16 @@ export default function App() {
 
               <div className="two-col">
                 <div>
-                  <h3>Learning Objectives</h3>
+                  <h3>Learning objectives</h3>
                   <List items={lesson.learningObjectives} />
                 </div>
                 <div>
-                  <h3>Teaching Anchor</h3>
+                  <h3>Teaching anchor</h3>
                   <p>{lesson.teachingAnchor}</p>
                 </div>
               </div>
 
-              <h3>Lesson Flow</h3>
+              <h3>Lesson flow</h3>
               <div className="timeline">
                 {lesson.lessonFlow.map((item, index) => (
                   <article key={`${item.segment}-${index}`}>
@@ -854,7 +1200,7 @@ export default function App() {
                   <List items={lesson.playBasedActivity.instructions} />
                 </div>
                 <div>
-                  <h3>Self-Directed Scaffold</h3>
+                  <h3>Self-directed scaffold</h3>
                   <p>
                     <strong>{lesson.selfDirectedLearning.framework}</strong>
                   </p>
@@ -870,7 +1216,7 @@ export default function App() {
                   <List items={lesson.reflection} />
                 </div>
                 <div>
-                  <h3>Educator Review</h3>
+                  <h3>Educator review</h3>
                   <List items={lesson.reviewNotes} />
                 </div>
               </div>
@@ -878,19 +1224,19 @@ export default function App() {
           )}
 
           {rehearsal && (
-            <Section title="Rehearsal Coach" icon={<Mic size={22} />}>
+            <Section title="Rehearsal coach" icon={<Mic size={22} />}>
               <p>{rehearsal.scenario}</p>
               <div className="two-col">
                 <div>
-                  <h3>Student Questions</h3>
+                  <h3>Student questions</h3>
                   <List items={rehearsal.studentQuestions} />
                 </div>
                 <div>
-                  <h3>Simpler Language</h3>
+                  <h3>Simpler language</h3>
                   <List items={rehearsal.simplerLanguage} />
                 </div>
               </div>
-              <h3>Suggested Responses</h3>
+              <h3>Suggested responses</h3>
               <List items={rehearsal.suggestedResponses} />
             </Section>
           )}

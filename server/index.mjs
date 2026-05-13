@@ -50,6 +50,7 @@ Stable product contract for every generated artifact:
 - When recommending self-directed learning, provide enough structure that students know the goal, options, timebox, check-in moment, and reflection prompt.
 - When recommending visual materials, describe what each item helps students do: notice, compare, choose, remember, discuss, arrange, rehearse, or reflect.
 - When recommending rehearsal, focus on the educator's confidence: simpler language, likely student objections, respectful answers, pacing, and transitions.
+- If lessonMemory is provided, treat it as classroom evidence from past lessons. Consider the lesson plan that was actually used, build on what worked, adjust what did not work, and carry forward next-time notes into the new lesson design.
 - Use concise language by default. Favor specific classroom moves over long theory. Avoid generic moralizing, vague inspiration, or unsupported doctrinal claims.
 - If a question is culturally or doctrinally sensitive, flag it for educator review instead of overconfidently resolving it.
 - Return only content that matches the requested JSON schema. Do not include markdown fences, commentary outside the JSON object, or fields not present in the schema.
@@ -89,6 +90,23 @@ function cachedInputTokens(response) {
     response.usage?.prompt_tokens_details?.cached_tokens ??
     0
   );
+}
+
+async function readUpstreamJson(response) {
+  const text = await response.text();
+  if (!text) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      error: {
+        message: text.replace(/\s+/g, " ").trim().slice(0, 240) || "Upstream returned a non-JSON response."
+      }
+    };
+  }
 }
 
 const lessonSchema = {
@@ -481,7 +499,7 @@ Current lesson context: ${JSON.stringify(context)}`,
       })
     });
 
-    const data = await response.json();
+    const data = await readUpstreamJson(response);
     if (!response.ok) {
       res.status(response.status).json({ error: data.error?.message || "Failed to create realtime client secret." });
       return;
