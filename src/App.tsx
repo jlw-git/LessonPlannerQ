@@ -22,9 +22,8 @@ import type { LessonBrief, LessonOption, LessonOptionsResponse, LessonPlan, Rehe
 
 type FormState = {
   topic: string;
-  outcome: string;
-  classContext: string;
-  voiceNotes: string;
+  lessonObjectives: string;
+  planningRequirements: string;
 };
 
 type TranscriptEntry = {
@@ -50,9 +49,9 @@ const reflectionStorageKey = "lesson-planner-q-reflections";
 
 const initialForm: FormState = {
   topic: "Compassion in daily life",
-  outcome: "Students can notice suffering in everyday situations and choose one compassionate response.",
-  classContext: "Students are energetic and enjoy role-play, but they can struggle to connect teachings to school life.",
-  voiceNotes: "Next week I want to teach compassion, but my students are restless and I want an activity."
+  lessonObjectives: "Students can notice suffering in everyday situations and choose one compassionate response.",
+  planningRequirements:
+    "Students are energetic and enjoy role-play, but they can struggle to connect teachings to school life. Include movement, clear scaffolding, and practical school-life examples."
 };
 
 function todayString() {
@@ -152,15 +151,15 @@ function Section({
 
 function describeRealtimeError(err: unknown) {
   if (err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "SecurityError")) {
-    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type brief instead\".";
+    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type the brief\".";
   }
 
   if (err instanceof DOMException && err.name === "NotFoundError") {
-    return "No microphone was found. Connect or enable a microphone, or use \"Type brief instead\".";
+    return "No microphone was found. Connect or enable a microphone, or use \"Type the brief\".";
   }
 
   if (err instanceof Error && /permission denied|notallowed/i.test(err.message)) {
-    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type brief instead\".";
+    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type the brief\".";
   }
 
   return err instanceof Error ? err.message : "Could not start realtime voice session";
@@ -196,6 +195,8 @@ export default function App() {
   const requestPayload = useMemo(
     () => ({
       ...form,
+      outcome: form.lessonObjectives,
+      classContext: form.planningRequirements,
       tradition: "Chinese Mahayana folk Buddhism",
       studentAge: "13",
       classSize: "4",
@@ -532,7 +533,7 @@ export default function App() {
               content: [
                 {
                   type: "input_text",
-                  text: `Start a voice lesson planning interview for this 90-minute lesson. The educator notes are: ${form.voiceNotes}`
+                  text: `Start a voice lesson planning interview for this 90-minute lesson. Topic: ${form.topic}. Lesson objectives: ${form.lessonObjectives}. Planning requirements: ${form.planningRequirements}.`
                 }
               ]
             }
@@ -613,9 +614,9 @@ export default function App() {
             <span className="typed-toggle-copy">
               <span>
                 <FileText size={18} />
-                Type your thoughts
+                Type the brief
               </span>
-              <small>Write the lesson idea, class context, and student takeaway.</small>
+              <small>Add the topic, objectives, and requirements.</small>
             </span>
             <ChevronDown className={showTypedBrief ? "rotate" : ""} size={18} />
           </button>
@@ -629,26 +630,20 @@ export default function App() {
 
               <label>
                 <Target size={16} />
-                Desired outcome
-                <textarea value={form.outcome} onChange={(event) => update("outcome", event.target.value)} rows={4} />
-              </label>
-
-              <label>
-                <MessageCircle size={16} />
-                Class context
+                Lesson objectives
                 <textarea
-                  value={form.classContext}
-                  onChange={(event) => update("classContext", event.target.value)}
+                  value={form.lessonObjectives}
+                  onChange={(event) => update("lessonObjectives", event.target.value)}
                   rows={4}
                 />
               </label>
 
               <label>
-                <Mic size={16} />
-                Voice planning notes
+                <MessageCircle size={16} />
+                Planning requirements
                 <textarea
-                  value={form.voiceNotes}
-                  onChange={(event) => update("voiceNotes", event.target.value)}
+                  value={form.planningRequirements}
+                  onChange={(event) => update("planningRequirements", event.target.value)}
                   rows={4}
                 />
               </label>

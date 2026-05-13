@@ -244,12 +244,7 @@ h3 {
   grid-column: 1 / -1;
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.typed-brief label:first-child,
-.typed-brief label:last-child {
-  grid-column: 1 / -1;
+  grid-template-columns: 1fr;
 }
 
 .typed-actions {
