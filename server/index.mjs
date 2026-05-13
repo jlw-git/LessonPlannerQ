@@ -17,6 +17,11 @@ const port = Number(process.env.PORT || 8787);
 const textModel = process.env.OPENAI_TEXT_MODEL || "gpt-5.4-mini";
 const realtimeModel = process.env.OPENAI_REALTIME_MODEL || "gpt-realtime-2";
 const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-2";
+const requestedPromptCacheRetention = process.env.OPENAI_PROMPT_CACHE_RETENTION || "in_memory";
+const promptCacheRetention = ["in_memory", "24h"].includes(requestedPromptCacheRetention)
+  ? requestedPromptCacheRetention
+  : "in_memory";
+const promptCacheVersion = "lesson-planner-q:v2";
 const apiKey = process.env.OPENAI_API_KEY;
 const client = apiKey ? new OpenAI({ apiKey }) : null;
 
@@ -29,6 +34,62 @@ Create practical, respectful, age-appropriate lessons that help students apply B
 Do not present Buddhism as one uniform tradition. Label the initial focus as Chinese Mahayana folk Buddhism.
 Prefer play-based learning and scaffolded self-directed learning using gradual release: I do, We do, You do.
 Keep the educator in control. Mark outputs as drafts for educator review.`;
+
+const cachedInstructionPrefix = `${baseContext}
+
+Stable product contract for every generated artifact:
+- Optimize for an educator preparing one realistic weekly lesson, not for a student using an unsupervised tutor.
+- Treat voice interview notes, typed notes, prior brief, selected option, rehearsal notes, and visual pack outputs as educator-provided planning context.
+- Preserve the educator's agency. Suggest, scaffold, and explain tradeoffs; do not imply that AI output is authoritative religious instruction.
+- Keep Buddhist teaching references respectful, concrete, and age-appropriate. Use Chinese Mahayana folk Buddhist context carefully and avoid collapsing different Buddhist traditions into one generic Buddhism.
+- Connect abstract ideas to ordinary 13-year-old life: friendship conflict, school stress, exclusion, online group chat, family responsibility, embarrassment, disappointment, attention, and kindness under pressure.
+- Prefer small-class dynamics for four students: paired practice, round-robin roles, quick reflection turns, short scenarios, visible artifacts, and educator checkpoints.
+- Plan for a 90-minute session with pacing that can flex if students are restless, finish early, or need a calmer reset.
+- Use gradual release as the default scaffold: the educator models first, the class practices together, then students make a supported choice or artifact independently.
+- Make play purposeful. Games, role-play, cards, storyboards, and movement should support the learning outcome rather than feel decorative.
+- When recommending self-directed learning, provide enough structure that students know the goal, options, timebox, check-in moment, and reflection prompt.
+- When recommending visual materials, describe what each item helps students do: notice, compare, choose, remember, discuss, arrange, rehearse, or reflect.
+- When recommending rehearsal, focus on the educator's confidence: simpler language, likely student objections, respectful answers, pacing, and transitions.
+- Use concise language by default. Favor specific classroom moves over long theory. Avoid generic moralizing, vague inspiration, or unsupported doctrinal claims.
+- If a question is culturally or doctrinally sensitive, flag it for educator review instead of overconfidently resolving it.
+- Return only content that matches the requested JSON schema. Do not include markdown fences, commentary outside the JSON object, or fields not present in the schema.
+
+Prompt-cache note: this shared prefix is intentionally stable across text generation routes. Task-specific instructions and dynamic lesson context appear after this prefix.`;
+
+function buildInstructions(taskInstructions) {
+  return `${cachedInstructionPrefix}
+
+Task-specific instructions:
+${taskInstructions}`;
+}
+
+function sortJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map(sortJsonValue);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map((key) => [key, sortJsonValue(value[key])])
+    );
+  }
+
+  return value;
+}
+
+function stableStringify(value) {
+  return JSON.stringify(sortJsonValue(value));
+}
+
+function cachedInputTokens(response) {
+  return (
+    response.usage?.input_tokens_details?.cached_tokens ??
+    response.usage?.prompt_tokens_details?.cached_tokens ??
+    0
+  );
+}
 
 const lessonSchema = {
   type: "object",
@@ -232,8 +293,10 @@ async function createJson({ instructions, input, schema, schemaName }) {
   const openai = requireClient();
   const response = await openai.responses.create({
     model: textModel,
-    instructions,
-    input,
+    instructions: buildInstructions(instructions),
+    input: stableStringify(input),
+    prompt_cache_key: `${promptCacheVersion}:${textModel}:${schemaName}`,
+    prompt_cache_retention: promptCacheRetention,
     reasoning: { effort: "low" },
     text: {
       format: {
@@ -244,6 +307,12 @@ async function createJson({ instructions, input, schema, schemaName }) {
       }
     }
   });
+
+  if (process.env.LOG_PROMPT_CACHE === "1") {
+    console.log(
+      `[prompt-cache] ${schemaName}: ${cachedInputTokens(response)} cached input tokens`
+    );
+  }
 
   const outputText = response.output_text;
   if (!outputText) {
@@ -258,7 +327,9 @@ app.get("/api/health", (_req, res) => {
     hasOpenAIKey: Boolean(apiKey),
     textModel,
     realtimeModel,
-    imageModel
+    imageModel,
+    promptCacheRetention,
+    promptCacheVersion
   });
 });
 
@@ -268,9 +339,8 @@ app.post("/api/lesson", async (req, res, next) => {
     const lesson = await createJson({
       schema: lessonSchema,
       schemaName: "lesson_plan",
-      instructions: `${baseContext}
-Generate one complete weekly lesson plan. Make it feasible for a small class and avoid generic moralizing.`,
-      input: JSON.stringify(payload, null, 2)
+      instructions: "Generate one complete weekly lesson plan. Make it feasible for a small class and avoid generic moralizing.",
+      input: payload
     });
     res.json(lesson);
   } catch (error) {
@@ -283,11 +353,10 @@ app.post("/api/brief", async (req, res, next) => {
     const brief = await createJson({
       schema: briefSchema,
       schemaName: "lesson_brief",
-      instructions: `${baseContext}
-Generate a concise educator-reviewed lesson brief before the full lesson plan.
+      instructions: `Generate a concise educator-reviewed lesson brief before the full lesson plan.
 Include clarifying questions the lesson planner would ask after the voice interview.
 Recommend whether a visual pack and rehearsal coach should be used next.`,
-      input: JSON.stringify(req.body, null, 2)
+      input: req.body
     });
     res.json(brief);
   } catch (error) {
@@ -300,11 +369,10 @@ app.post("/api/options", async (req, res, next) => {
     const options = await createJson({
       schema: lessonOptionsSchema,
       schemaName: "lesson_options",
-      instructions: `${baseContext}
-Generate exactly three distinct lesson plan options the educator can compare before committing to a brief.
+      instructions: `Generate exactly three distinct lesson plan options the educator can compare before committing to a brief.
 Make the options meaningfully different in pedagogy, pacing, and material needs.
 Keep each option concise and scannable.`,
-      input: JSON.stringify(req.body, null, 2)
+      input: req.body
     });
     res.json(options);
   } catch (error) {
@@ -317,10 +385,9 @@ app.post("/api/brief/update", async (req, res, next) => {
     const brief = await createJson({
       schema: briefSchema,
       schemaName: "updated_lesson_brief",
-      instructions: `${baseContext}
-Update the existing lesson brief using the educator's feedback.
+      instructions: `Update the existing lesson brief using the educator's feedback.
 Preserve useful prior decisions, revise what the educator asked to change, and update visual/rehearsal recommendations if needed.`,
-      input: JSON.stringify(req.body, null, 2)
+      input: req.body
     });
     res.json(brief);
   } catch (error) {
@@ -333,9 +400,8 @@ app.post("/api/rehearsal", async (req, res, next) => {
     const rehearsal = await createJson({
       schema: rehearsalSchema,
       schemaName: "rehearsal_coach",
-      instructions: `${baseContext}
-Simulate realistic, respectful 13-year-old questions and coach the educator to explain more clearly.`,
-      input: JSON.stringify(req.body, null, 2)
+      instructions: "Simulate realistic, respectful 13-year-old questions and coach the educator to explain more clearly.",
+      input: req.body
     });
     res.json(rehearsal);
   } catch (error) {
@@ -348,9 +414,8 @@ app.post("/api/visuals", async (req, res, next) => {
     const visuals = await createJson({
       schema: visualSchema,
       schemaName: "visual_material_pack",
-      instructions: `${baseContext}
-Create a printable visual pack plan. Avoid casual depictions of sacred figures unless the educator specifically requested them. Include cultural review notes.`,
-      input: JSON.stringify(req.body, null, 2)
+      instructions: "Create a printable visual pack plan. Avoid casual depictions of sacred figures unless the educator specifically requested them. Include cultural review notes.",
+      input: req.body
     });
     res.json(visuals);
   } catch (error) {

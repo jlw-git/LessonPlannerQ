@@ -21,6 +21,8 @@ npm install
 
 2. Create `.env.local` from `.env.example` and add your OpenAI API key.
 
+   Prompt caching is enabled automatically for repeated OpenAI text requests. Keep `OPENAI_PROMPT_CACHE_RETENTION=in_memory` for the default cache behavior, or set it to `24h` if your selected model supports extended prompt cache retention. Set `LOG_PROMPT_CACHE=1` while developing to print cached input token counts for each text generation route.
+
 3. Start the app:
 
 ```bash

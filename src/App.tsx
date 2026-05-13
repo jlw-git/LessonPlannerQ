@@ -98,6 +98,7 @@ export default function App() {
   const [brief, setBrief] = useState<LessonBrief | null>(null);
   const [lessonOptions, setLessonOptions] = useState<LessonOption[]>([]);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
+  const [expandedOptionIndex, setExpandedOptionIndex] = useState<number | null>(null);
   const [lesson, setLesson] = useState<LessonPlan | null>(null);
   const [visuals, setVisuals] = useState<VisualPack | null>(null);
   const [rehearsal, setRehearsal] = useState<Rehearsal | null>(null);
@@ -163,6 +164,7 @@ export default function App() {
   const generateOptions = () => {
     setLessonOptions([]);
     setSelectedOptionIndex(null);
+    setExpandedOptionIndex(null);
     setBrief(null);
     setLesson(null);
     setVisuals(null);
@@ -175,6 +177,7 @@ export default function App() {
 
   const selectOption = (index: number) => {
     setSelectedOptionIndex(index);
+    setExpandedOptionIndex(index);
     setBrief(null);
     setLesson(null);
     setVisuals(null);
@@ -576,42 +579,81 @@ export default function App() {
           )}
 
           {lessonOptions.length > 0 && (
-            <Section title="Review lesson options" icon={<FileText size={22} />}>
-              <p className="muted">
-                Compare the approaches, pick the one that best fits the class, then generate a brief from that option.
-              </p>
-              <div className="option-grid">
-                {lessonOptions.map((option, index) => (
-                  <article className={selectedOptionIndex === index ? "selected" : ""} key={`${option.title}-${index}`}>
-                    <div>
-                      <span className="option-kicker">Option {index + 1}</span>
+            <Section title="Choose a lesson approach" icon={<FileText size={22} />}>
+              <p className="muted">Scan the options, select one, then review the details before generating the brief.</p>
+              <div className="option-picker">
+                {lessonOptions.map((option, index) => {
+                  const isSelected = selectedOptionIndex === index;
+                  const isExpanded = expandedOptionIndex === index;
+
+                  return (
+                    <article
+                      className={`option-summary-card ${isSelected ? "selected" : ""} ${isExpanded ? "expanded" : ""}`}
+                      key={`${option.title}-${index}`}
+                    >
+                      <div className="option-card-head">
+                        <span className="option-kicker">Option {index + 1}</span>
+                      </div>
                       <h3>{option.title}</h3>
-                      <p>{option.approach}</p>
-                    </div>
-                    <div>
-                      <strong>Best for</strong>
                       <p>{option.bestFor}</p>
-                    </div>
-                    <div>
-                      <strong>Activities</strong>
-                      <List items={option.activities} />
-                    </div>
-                    <div>
-                      <strong>Tradeoffs</strong>
-                      <List items={option.tradeoffs} />
-                    </div>
-                    <button onClick={() => selectOption(index)}>
-                      {selectedOptionIndex === index ? <CheckCircle2 size={18} /> : <FileText size={18} />}
-                      {selectedOptionIndex === index ? "Selected" : "Select"}
-                    </button>
-                  </article>
-                ))}
-              </div>
-              <div className="inline-actions">
-                <button onClick={generateBrief} disabled={Boolean(loading) || selectedOptionIndex === null}>
-                  {loading === "brief" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                  Generate brief from selected option
-                </button>
+                      <div className="activity-chips" aria-label={`Sample activities for ${option.title}`}>
+                        {option.activities.slice(0, 2).map((activity, activityIndex) => (
+                          <span key={`${activity}-${activityIndex}`}>{activity}</span>
+                        ))}
+                        {option.activities.length > 2 && <span>+{option.activities.length - 2} more</span>}
+                      </div>
+                      <div className="option-card-actions">
+                        <button onClick={() => selectOption(index)}>
+                          {isSelected ? <CheckCircle2 size={18} /> : <FileText size={18} />}
+                          {isSelected ? "Selected" : "Select"}
+                        </button>
+                        <button
+                          aria-expanded={isExpanded}
+                          className="quiet-button"
+                          onClick={() => setExpandedOptionIndex(isExpanded ? null : index)}
+                        >
+                          <ChevronDown className={isExpanded ? "rotate" : ""} size={18} />
+                          {isExpanded ? "Hide plan" : "Read plan"}
+                        </button>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="option-expanded">
+                          <div className="option-detail-header">
+                            <span className="option-pill">
+                              {option.visualPackRecommended ? "Visuals recommended" : "Visuals optional"}
+                            </span>
+                          </div>
+                          <p>{option.approach}</p>
+                          <div className="option-detail-grid">
+                            <div>
+                              <strong>Lesson shape</strong>
+                              <List items={option.lessonShape} />
+                            </div>
+                            <div>
+                              <strong>Activities</strong>
+                              <List items={option.activities} />
+                            </div>
+                            <div>
+                              <strong>Tradeoffs</strong>
+                              <List items={option.tradeoffs} />
+                            </div>
+                            <div>
+                              <strong>Rehearsal focus</strong>
+                              <p>{option.rehearsalFocus}</p>
+                            </div>
+                          </div>
+                          {isSelected && (
+                            <button onClick={generateBrief} disabled={Boolean(loading)}>
+                              {loading === "brief" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+                              Generate brief from selected option
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
               </div>
             </Section>
           )}
