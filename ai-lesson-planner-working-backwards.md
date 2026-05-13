@@ -2,7 +2,7 @@
 
 ## Customer
 
-The primary customer is a Buddhist educator teaching a small weekly class of 13-year-old students. The class has around four students, and the educator wants lessons that are meaningful, engaging, and relevant to students' daily lives.
+The primary customer is a Buddhist educator teaching a small weekly class of 13-year-old students. The class has around four students, and each lesson is usually 90 minutes. The educator wants lessons that are meaningful, engaging, and relevant to students' daily lives.
 
 The educator may be a volunteer or part-time teacher, not a trained curriculum designer. They care deeply about helping students apply Buddhist teachings, but they face limited preparation time, scattered source materials, and uncertainty about how to run play-based or self-directed learning well.
 
@@ -29,7 +29,7 @@ The educator opens the AI Lesson Planner and enters a few details:
 - lesson topic or value, such as compassion, karma, gratitude, mindfulness, filial piety, or repentance
 - student age
 - class size
-- lesson duration
+- lesson duration, defaulting to 90 minutes
 - preferred teaching style
 - desired learning outcome
 - source tradition, initially Chinese Mahayana folk Buddhism
@@ -83,6 +83,20 @@ AI can now help convert scattered knowledge into structured teaching materials, 
 
 Realtime voice and image generation make the product more useful at the moments where educators feel the most friction: thinking through a lesson, preparing materials, responding live in class, and remembering what happened afterward.
 
+## Why This Product Wins
+
+Generic AI lesson planners can create activities quickly, but they usually miss the educator's deeper problem: Buddhist education is source-fragmented, tradition-sensitive, values-based, and often taught by volunteers who need confidence as much as content.
+
+This product is better for this educator because it is purpose-built around the actual teaching context:
+
+- It defaults to Chinese Mahayana folk Buddhism instead of treating Buddhism as one uniform subject.
+- It designs for 90-minute small-group lessons rather than generic school-period plans.
+- It emphasizes real-life application, not just content coverage.
+- It scaffolds self-directed learning with "I do, We do, You do" instead of simply telling students to explore independently.
+- It includes educator rehearsal, so the teacher can practice answering skeptical or emotionally sensitive questions before class.
+- It generates visual and play-based materials for a class of four, reducing the educator's design and prep burden.
+- It keeps the educator in control with review notes, tradition labels, and culturally sensitive image guidance.
+
 ## Customer Benefit
 
 For educators, the product saves preparation time, reduces stress, and increases confidence in using play-based and self-directed learning.
@@ -99,7 +113,7 @@ The first version focuses only on Chinese Mahayana folk Buddhism for 13-year-old
 
 The MVP should support:
 
-- weekly lesson plan generation
+- weekly 90-minute lesson plan generation
 - topic-based lesson creation
 - voice-based lesson planning interview
 - age-appropriate explanations
@@ -122,6 +136,7 @@ The live facilitation copilot and reflection circle assistant can follow after t
 - weekly lesson preparation time is reduced by at least 50%
 - educators rate generated lessons as useful or very useful
 - educators reuse or adapt generated lessons across multiple weeks
+- educators report that generated 90-minute plans are easier to facilitate than generic AI-generated lesson plans
 - educators use voice planning or rehearsal before class
 - educators generate at least one printable or visual material for a lesson
 - students can explain how a Buddhist teaching applies to daily life

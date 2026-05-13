@@ -8,9 +8,9 @@ AI Lesson Planner
 
 ### Product Summary
 
-AI Lesson Planner is a lesson preparation tool for Buddhist educators. It helps educators generate weekly lesson plans, play-based activities, scaffolded self-directed learning tasks, visual classroom materials, and rehearsal support for classes of 13-year-old students.
+AI Lesson Planner is a lesson preparation tool for Buddhist educators. It helps educators generate weekly 90-minute lesson plans, play-based activities, scaffolded self-directed learning tasks, visual classroom materials, and rehearsal support for classes of 13-year-old students.
 
-The first version focuses on Chinese Mahayana folk Buddhism and small classes of around four students. The product helps educators translate scattered Buddhist teachings, stories, practices, and values into classroom-ready lessons that students can relate to and apply in daily life.
+The first version focuses on Chinese Mahayana folk Buddhism, 90-minute lessons, and small classes of around four students. The product helps educators translate scattered Buddhist teachings, stories, practices, and values into classroom-ready lessons that students can relate to and apply in daily life.
 
 ### Product Vision
 
@@ -34,6 +34,7 @@ The result is that educators may spend too much time preparing, repeat familiar 
 
 - Reduce weekly lesson preparation time for Buddhist educators.
 - Generate age-appropriate weekly lesson plans grounded in Chinese Mahayana folk Buddhism.
+- Default to 90-minute lessons while allowing duration customization.
 - Help students connect Buddhist teachings to daily life, including friendship, anger, family expectations, school stress, compassion, gratitude, and social media behavior.
 - Support play-based learning and scaffolded self-directed learning.
 - Give educators facilitation notes that make lessons easier to run.
@@ -69,10 +70,29 @@ The educator may not be formally trained in curriculum design. They want lessons
 
 - Age: 13 years old.
 - Class size: approximately four students.
+- Lesson length: usually 90 minutes.
 - Learning goal: see the relevance of Buddhist teachings and apply them in everyday life.
 - Preferred lesson style: play-based learning and scaffolded self-directed learning.
 
-## 5. User Needs
+## 5. Differentiation
+
+### Why This Product Is Better Than Generic AI Lesson Planners
+
+Generic AI lesson planners can generate activities, worksheets, and lesson outlines. For this educator, that is helpful but incomplete. The harder problem is not just producing content; it is turning scattered Buddhist teachings into respectful, age-appropriate, practice-oriented lessons that a volunteer educator can confidently facilitate for 90 minutes.
+
+AI Lesson Planner is differentiated in seven ways:
+
+- Tradition-specific: It defaults to Chinese Mahayana folk Buddhism and avoids presenting Buddhism as one uniform tradition.
+- 90-minute lesson design: It structures lessons for the actual weekly class length rather than assuming a short school period.
+- Small-class fit: It designs activities for four students, where discussion, role play, and turn-taking can be more personal.
+- Application-first: It connects teachings to school, family, friendship, stress, social media, and moral choices.
+- Scaffolded pedagogy: It uses gradual release of responsibility so self-directed learning is supported rather than vague.
+- Educator confidence: It includes rehearsal coaching for difficult questions, skeptical students, and simpler explanations.
+- Material readiness: It generates visual packs, scenario cards, role-play cards, storyboards, and reflection worksheets that reduce prep time beyond the written lesson plan.
+
+The product should be evaluated against generic AI lesson planners not only on output speed, but on whether the educator feels more prepared to teach respectfully, facilitate discussion, and help students apply Buddhist teachings in daily life.
+
+## 6. User Needs
 
 ### Educator Needs
 
@@ -93,11 +113,11 @@ The educator may not be formally trained in curriculum design. They want lessons
 - I need Buddhist teachings explained in language I can understand.
 - I need room to ask questions without feeling judged.
 
-## 6. Core Use Cases
+## 7. Core Use Cases
 
 ### Use Case 1: Generate A Weekly Lesson Plan
 
-The educator enters a topic, age, class size, lesson duration, teaching style, and desired outcome. The product generates a complete lesson plan with objectives, activities, discussion prompts, facilitation notes, and reflection tasks.
+The educator enters a topic, age, class size, lesson duration, teaching style, and desired outcome. The default lesson duration is 90 minutes. The product generates a complete lesson plan with objectives, activities, discussion prompts, facilitation notes, and reflection tasks.
 
 Example topic: compassion in daily life.
 
@@ -159,14 +179,14 @@ After class, the educator records a short debrief:
 
 The product converts this into class memory, planning context, and suggested follow-up for the next lesson.
 
-## 7. MVP Scope
+## 8. MVP Scope
 
 ### Included In MVP
 
 - Topic-based weekly lesson plan generation.
 - Chinese Mahayana folk Buddhism as the initial tradition focus.
 - Student age and class size customization.
-- Lesson duration customization.
+- 90-minute lesson default with lesson duration customization.
 - Play-based activity generation.
 - Scaffolded self-directed learning generation using an established structure such as gradual release of responsibility: "I do, we do, you do."
 - Educator facilitation notes.
@@ -190,11 +210,12 @@ The product converts this into class memory, planning context, and suggested fol
 - Direct student-facing AI tutor.
 - Multi-subject expansion.
 
-## 8. Functional Requirements
+## 9. Functional Requirements
 
 ### Lesson Plan Generator
 
 - The system must allow educators to input lesson topic, student age, class size, lesson duration, teaching style, and learning goal.
+- The system must default lesson duration to 90 minutes.
 - The system must generate a complete weekly lesson plan.
 - The lesson plan must include learning objectives, opening activity, main activity, discussion prompts, reflection questions, facilitation notes, materials, and optional take-home activity.
 - The system must support play-based and self-directed lesson formats.
@@ -252,7 +273,7 @@ The product converts this into class memory, planning context, and suggested fol
 - The system should extract what worked, what students struggled with, and what to follow up on.
 - The system should convert debriefs into planning context for future lessons.
 
-## 9. Non-Functional Requirements
+## 10. Non-Functional Requirements
 
 ### Quality
 
@@ -281,7 +302,7 @@ The product converts this into class memory, planning context, and suggested fol
 - A complete lesson plan plus visual material suggestions should be generated in under 5 minutes.
 - The educator should be able to reach a usable lesson draft in under 10 minutes.
 
-## 10. AI Capability Mapping
+## 11. AI Capability Mapping
 
 ### GPT Realtime 2
 
@@ -308,7 +329,7 @@ GPT Image 2 should power classroom material generation:
 
 Image generation is most valuable where the educator would otherwise need design time, illustration skill, or printable material preparation.
 
-## 11. Content And Pedagogy Requirements
+## 12. Content And Pedagogy Requirements
 
 ### Tradition Focus
 
@@ -317,6 +338,10 @@ The MVP must focus on Chinese Mahayana folk Buddhism. It should acknowledge that
 ### Age Appropriateness
 
 Lessons should be designed for 13-year-old students. Content should avoid overly abstract, moralizing, or adult-oriented framing. It should connect teachings to daily life.
+
+### Lesson Length
+
+The default lesson length should be 90 minutes. Generated lessons should include enough variety to sustain attention across the full session, including opening, teaching anchor, play-based activity, scaffolded self-directed task, discussion, reflection, and close.
 
 ### Teaching Style
 
@@ -337,11 +362,15 @@ The MVP should use gradual release of responsibility:
 - We do: class explores a scenario together.
 - You do: students apply the teaching independently, in pairs, or through a small-group activity.
 
-## 12. Example Generated Lesson Output
+## 13. Example Generated Lesson Output
 
 ### Lesson Topic
 
 Compassion in daily life.
+
+### Lesson Length
+
+90 minutes.
 
 ### Teaching Anchor
 
@@ -359,7 +388,7 @@ How to respond when a classmate is excluded, teased, or upset.
 - Reflection: students answer, "What suffering did I notice? What helpful response could I choose?"
 - Visual material: four comic-style panels showing a student choosing compassion during a school conflict.
 
-## 13. Success Metrics
+## 14. Success Metrics
 
 ### Activation Metrics
 
@@ -380,6 +409,7 @@ How to respond when a classmate is excluded, teased, or upset.
 - Educators can create a usable lesson plan in under 10 minutes.
 - Weekly preparation time is reduced by at least 50%.
 - Educators rate generated lessons as useful or very useful.
+- Educators report that generated 90-minute plans are easier to facilitate than generic AI-generated lesson plans.
 - Educators report increased confidence using self-directed learning.
 - Students can explain how a Buddhist teaching applies to daily life.
 
@@ -390,7 +420,7 @@ How to respond when a classmate is excluded, teased, or upset.
 - Percentage of generated visuals rated culturally appropriate by educators.
 - Number of content accuracy or sensitivity issues reported.
 
-## 14. Risks And Mitigations
+## 15. Risks And Mitigations
 
 ### Risk: Doctrinal Inaccuracy Or Oversimplification
 
@@ -416,11 +446,15 @@ Mitigation: Use respectful visual style presets, provide restricted image catego
 
 Mitigation: Use a clear framework, include checkpoints, provide educator facilitation notes, and adapt tasks for small classes.
 
-## 15. Rollout Plan
+### Risk: 90-Minute Lessons Feel Too Long Or Repetitive
+
+Mitigation: Structure lessons with varied modes: short teaching, discussion, game, self-directed task, sharing, reflection, and optional extension activities.
+
+## 16. Rollout Plan
 
 ### Phase 1: Preparation MVP
 
-- Weekly lesson plan generator.
+- Weekly 90-minute lesson plan generator.
 - Editable lesson output.
 - Play-based activity generator.
 - Scaffolded self-directed learning activities.
@@ -451,7 +485,7 @@ Mitigation: Use a clear framework, include checkpoints, provide educator facilit
 - Other subjects such as values education, culture, history, language learning, and character education.
 - Organization-level curriculum management.
 
-## 16. Open Questions
+## 17. Open Questions
 
 - Which Chinese Mahayana folk Buddhist sources should be included in the first curated library?
 - Should the first version support English only, or English plus Chinese terms and explanations?
@@ -461,10 +495,12 @@ Mitigation: Use a clear framework, include checkpoints, provide educator facilit
 - What consent and privacy requirements apply if educator voice notes or class debriefs mention students?
 - What is the minimum viable export format: Markdown, PDF, Google Docs, printable worksheet, or slide deck?
 - Should the product be designed first for individual educators or temple education coordinators?
+- How much flexibility is needed for lessons shorter or longer than 90 minutes?
 
-## 17. Launch Criteria
+## 18. Launch Criteria
 
 - Educators can generate and edit a full lesson plan in under 10 minutes.
+- Generated lesson plans default to a complete 90-minute structure.
 - Generated lessons consistently include play-based and scaffolded self-directed learning components.
 - Educators can generate at least one useful visual or printable material per lesson.
 - Rehearsal coach produces realistic student questions and helpful simplifications.
