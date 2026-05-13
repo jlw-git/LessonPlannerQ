@@ -23,7 +23,7 @@ type FormState = {
 
 type TranscriptEntry = {
   id: string;
-  role: "educator" | "planner" | "system";
+  role: "educator" | "planner";
   text: string;
 };
 
@@ -251,23 +251,63 @@ export default function App() {
     window.setTimeout(() => transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }), 0);
   };
 
+  const upsertTranscript = (id: string, role: TranscriptEntry["role"], text: string, mode: "append" | "replace") => {
+    setTranscript((current) => {
+      const existingIndex = current.findIndex((entry) => entry.id === id);
+      if (existingIndex === -1) {
+        return [...current, { id, role, text }];
+      }
+
+      const next = [...current];
+      const existing = next[existingIndex];
+      next[existingIndex] = {
+        ...existing,
+        role,
+        text: mode === "append" ? `${existing.text}${text}` : text
+      };
+      return next;
+    });
+    window.setTimeout(() => transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }), 0);
+  };
+
   const handleRealtimeEvent = (event: MessageEvent<string>) => {
     try {
       const data = JSON.parse(event.data);
-      const text =
-        data.transcript ||
-        data.delta ||
-        data.item?.content?.[0]?.transcript ||
-        data.item?.content?.[0]?.text ||
-        data.response?.output?.[0]?.content?.[0]?.transcript ||
-        data.response?.output?.[0]?.content?.[0]?.text;
+      const type = data.type || "";
 
-      if (!text || typeof text !== "string") {
+      if (type === "response.audio_transcript.delta" || type === "response.output_text.delta") {
+        const id = data.item_id || data.response_id || "planner-live";
+        if (typeof data.delta === "string") {
+          upsertTranscript(id, "planner", data.delta, "append");
+        }
         return;
       }
 
-      const role = data.item?.role === "user" || data.role === "user" ? "educator" : "planner";
-      addTranscript({ role, text });
+      if (type === "response.audio_transcript.done" || type === "response.output_text.done") {
+        const id = data.item_id || data.response_id || "planner-live";
+        if (typeof data.transcript === "string" || typeof data.text === "string") {
+          upsertTranscript(id, "planner", data.transcript || data.text, "replace");
+        }
+        return;
+      }
+
+      if (type === "conversation.item.input_audio_transcription.completed") {
+        const id = data.item_id || `educator-${Date.now()}`;
+        if (typeof data.transcript === "string") {
+          upsertTranscript(id, "educator", data.transcript, "replace");
+        }
+        return;
+      }
+
+      if (type === "conversation.item.created") {
+        const role = data.item?.role === "user" ? "educator" : "planner";
+        const content = data.item?.content?.find((part: { transcript?: string; text?: string }) => part.transcript || part.text);
+        const text = content?.transcript || content?.text;
+        const id = data.item?.id || `${role}-${Date.now()}`;
+        if (typeof text === "string") {
+          upsertTranscript(id, role, text, "replace");
+        }
+      }
     } catch {
       // Realtime event shapes can vary. Ignore non-JSON or non-transcript events.
     }
@@ -283,7 +323,7 @@ export default function App() {
     setError(null);
     setTranscript([]);
     addTranscript({
-      role: "system",
+      role: "planner",
       text: "Starting voice interview. Allow microphone access if your browser asks."
     });
     try {
@@ -320,7 +360,7 @@ export default function App() {
       channel.addEventListener("message", handleRealtimeEvent);
       channel.addEventListener("open", () => {
         addTranscript({
-          role: "system",
+          role: "planner",
           text: "Connected. The planner will ask clarifying questions one at a time."
         });
         channel.send(
@@ -362,7 +402,7 @@ export default function App() {
       });
       setRealtimeStatus("live");
       addTranscript({
-        role: "system",
+        role: "planner",
         text: "Voice interview is live. Speak naturally; the transcript will appear here when text events are available."
       });
     } catch (err) {
@@ -385,6 +425,7 @@ export default function App() {
       </header>
 
       <div className="workspace">
+        {realtimeStatus === "idle" && (
         <section className="brief-composer" aria-label="Lesson input">
           <section className="voice-first">
             <span className="voice-orb">
@@ -394,9 +435,9 @@ export default function App() {
               <h2>Start by voice</h2>
               <p>Talk through the lesson idea, class context, and what you want students to take away.</p>
             </div>
-            <button onClick={startRealtime} disabled={realtimeStatus === "connecting"} className="voice-primary">
-              {realtimeStatus === "connecting" ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
-              {realtimeStatus === "live" ? "Stop interview" : "Start voice interview"}
+            <button onClick={startRealtime} className="voice-primary">
+              <Mic size={18} />
+              Start voice interview
             </button>
           </section>
 
@@ -447,21 +488,34 @@ export default function App() {
             </div>
           )}
         </section>
+        )}
 
         {realtimeStatus !== "idle" && (
-          <section className="transcript-panel" aria-live="polite">
-            <div>
-              <h2>Voice interview transcript</h2>
-              <p>{realtimeStatus === "connecting" ? "Connecting to the planner..." : "Follow the conversation here."}</p>
+          <section className="voice-stage" aria-live="polite">
+            <div className="voice-stage-top">
+              <span>Voice interview</span>
+              <strong>{realtimeStatus === "connecting" ? "Connecting" : "Live"}</strong>
             </div>
-            <div className="transcript-log" ref={transcriptRef}>
-              {transcript.map((entry) => (
-                <article className={entry.role} key={entry.id}>
-                  <strong>{entry.role === "educator" ? "Educator" : entry.role === "planner" ? "Planner" : "System"}</strong>
-                  <p>{entry.text}</p>
-                </article>
-              ))}
+            <div className="voice-stage-center">
+              <button onClick={startRealtime} className="stage-mic" aria-label="Stop voice interview">
+                <Mic size={42} />
+              </button>
+              <p>{realtimeStatus === "connecting" ? "Connecting to the lesson planner..." : "Planner is listening"}</p>
+              <button onClick={stopRealtime} className="end-session">
+                End session
+              </button>
             </div>
+            <aside className="transcript-drawer">
+              <h2>Transcript</h2>
+              <div className="transcript-log" ref={transcriptRef}>
+                {transcript.map((entry) => (
+                  <article className={entry.role} key={entry.id}>
+                    <strong>{entry.role === "educator" ? "You" : "PlannerQ"}</strong>
+                    <p>{entry.text}</p>
+                  </article>
+                ))}
+              </div>
+            </aside>
           </section>
         )}
 

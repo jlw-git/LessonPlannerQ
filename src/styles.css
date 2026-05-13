@@ -216,69 +216,127 @@ h3 {
   width: 100%;
 }
 
-.transcript-panel {
-  background: #fffdf7;
+.voice-stage {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(36, 88, 79, 0.1), transparent 34%),
+    #f7f4ed;
   border-bottom: 1px solid #ded3bf;
   display: grid;
-  gap: 14px;
-  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  min-height: 560px;
   padding: 18px clamp(20px, 4vw, 56px);
+  position: relative;
 }
 
-.transcript-panel h2 {
-  font-size: 1.15rem;
-  margin-bottom: 6px;
-}
-
-.transcript-panel > div > p {
+.voice-stage-top {
+  align-items: center;
   color: #617066;
-  line-height: 1.45;
-  margin-bottom: 0;
-}
-
-.transcript-log {
-  background: #f7f1e5;
-  border: 1px solid #e3d5bf;
-  border-radius: 8px;
-  display: grid;
+  display: flex;
+  font-size: 0.82rem;
+  font-weight: 850;
   gap: 10px;
-  max-height: 260px;
-  overflow: auto;
-  padding: 12px;
-}
-
-.transcript-log article {
-  background: #fffdf7;
-  border: 1px solid #e3d5bf;
-  border-radius: 8px;
-  display: grid;
-  gap: 4px;
-  padding: 10px;
-}
-
-.transcript-log article.planner {
-  background: #edf5ef;
-  border-color: #c7ddce;
-}
-
-.transcript-log article.educator {
-  background: #fffaf0;
-}
-
-.transcript-log article.system {
-  background: #f4ead8;
-}
-
-.transcript-log strong {
-  color: #24584f;
-  font-size: 0.78rem;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
-.transcript-log p {
-  line-height: 1.45;
+.voice-stage-top strong::before {
+  background: #2d8a5f;
+  border-radius: 999px;
+  content: "";
+  display: inline-block;
+  height: 7px;
+  margin-right: 7px;
+  width: 7px;
+}
+
+.voice-stage-center {
+  align-self: center;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
+}
+
+.stage-mic {
+  background: #fffdf7;
+  border: 1px solid #ded3bf;
+  border-radius: 999px;
+  box-shadow: 0 18px 48px rgba(36, 88, 79, 0.12);
+  color: #24584f;
+  height: 132px;
+  width: 132px;
+}
+
+.stage-mic:hover:not(:disabled) {
+  background: #fffaf0;
+  border-color: #b9d5c9;
+}
+
+.voice-stage-center p {
+  color: #617066;
+  font-size: 1.1rem;
+  font-style: italic;
   margin-bottom: 0;
 }
+
+.end-session {
+  background: #6b2e2a;
+  border-color: #6b2e2a;
+  color: #fffaf0;
+  font-weight: 800;
+}
+
+.end-session:hover:not(:disabled) {
+  background: #54231f;
+  border-color: #54231f;
+}
+
+.transcript-drawer {
+  align-self: end;
+  background: rgba(255, 253, 247, 0.92);
+  border: 1px solid #ded3bf;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  max-width: 760px;
+  padding: 12px;
+}
+
+.transcript-drawer h2 {
+  color: #617066;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  margin-bottom: 0;
+  text-transform: uppercase;
+}
+
+.transcript-log {
+  display: grid;
+  gap: 8px;
+  max-height: 190px;
+  overflow: auto;
+}
+
+.transcript-log article {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.transcript-log strong {
+  color: #8a5d2b;
+  font-size: 0.74rem;
+  text-transform: lowercase;
+}
+
+.transcript-log p {
+  color: #17201b;
+  line-height: 1.42;
+  margin-bottom: 0;
+}
+
+.transcript-log article.planner strong {
+  color: #24584f;
+}
+
 
 .section-title {
   align-items: center;
