@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 import express from "express";
 import OpenAI from "openai";
@@ -517,6 +518,10 @@ app.use((error, _req, res, _next) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`Lesson Planner Q API listening on http://127.0.0.1:${port}`);
-});
+export { app };
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  app.listen(port, () => {
+    console.log(`Lesson Planner Q API listening on http://127.0.0.1:${port}`);
+  });
+}
