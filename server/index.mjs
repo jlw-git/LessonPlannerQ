@@ -99,6 +99,74 @@ const lessonSchema = {
   ]
 };
 
+const briefSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    title: { type: "string" },
+    briefSummary: { type: "string" },
+    studentTakeaway: { type: "string" },
+    clarifyingQuestions: { type: "array", items: { type: "string" } },
+    keyChoices: { type: "array", items: { type: "string" } },
+    suggestedStructure: { type: "array", items: { type: "string" } },
+    visualPackRecommended: { type: "boolean" },
+    visualPackRationale: { type: "string" },
+    rehearsalRecommended: { type: "boolean" },
+    rehearsalFocus: { type: "string" },
+    changeLog: { type: "array", items: { type: "string" } },
+    reviewPrompts: { type: "array", items: { type: "string" } }
+  },
+  required: [
+    "title",
+    "briefSummary",
+    "studentTakeaway",
+    "clarifyingQuestions",
+    "keyChoices",
+    "suggestedStructure",
+    "visualPackRecommended",
+    "visualPackRationale",
+    "rehearsalRecommended",
+    "rehearsalFocus",
+    "changeLog",
+    "reviewPrompts"
+  ]
+};
+
+const lessonOptionsSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    options: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          title: { type: "string" },
+          approach: { type: "string" },
+          bestFor: { type: "string" },
+          lessonShape: { type: "array", items: { type: "string" } },
+          activities: { type: "array", items: { type: "string" } },
+          tradeoffs: { type: "array", items: { type: "string" } },
+          visualPackRecommended: { type: "boolean" },
+          rehearsalFocus: { type: "string" }
+        },
+        required: [
+          "title",
+          "approach",
+          "bestFor",
+          "lessonShape",
+          "activities",
+          "tradeoffs",
+          "visualPackRecommended",
+          "rehearsalFocus"
+        ]
+      }
+    }
+  },
+  required: ["options"]
+};
+
 const visualSchema = {
   type: "object",
   additionalProperties: false,
@@ -205,6 +273,56 @@ Generate one complete weekly lesson plan. Make it feasible for a small class and
       input: JSON.stringify(payload, null, 2)
     });
     res.json(lesson);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/brief", async (req, res, next) => {
+  try {
+    const brief = await createJson({
+      schema: briefSchema,
+      schemaName: "lesson_brief",
+      instructions: `${baseContext}
+Generate a concise educator-reviewed lesson brief before the full lesson plan.
+Include clarifying questions the lesson planner would ask after the voice interview.
+Recommend whether a visual pack and rehearsal coach should be used next.`,
+      input: JSON.stringify(req.body, null, 2)
+    });
+    res.json(brief);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/options", async (req, res, next) => {
+  try {
+    const options = await createJson({
+      schema: lessonOptionsSchema,
+      schemaName: "lesson_options",
+      instructions: `${baseContext}
+Generate exactly three distinct lesson plan options the educator can compare before committing to a brief.
+Make the options meaningfully different in pedagogy, pacing, and material needs.
+Keep each option concise and scannable.`,
+      input: JSON.stringify(req.body, null, 2)
+    });
+    res.json(options);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/brief/update", async (req, res, next) => {
+  try {
+    const brief = await createJson({
+      schema: briefSchema,
+      schemaName: "updated_lesson_brief",
+      instructions: `${baseContext}
+Update the existing lesson brief using the educator's feedback.
+Preserve useful prior decisions, revise what the educator asked to change, and update visual/rehearsal recommendations if needed.`,
+      input: JSON.stringify(req.body, null, 2)
+    });
+    res.json(brief);
   } catch (error) {
     next(error);
   }

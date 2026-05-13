@@ -1,33 +1,34 @@
 import { useMemo, useRef, useState } from "react";
 import {
   BookOpen,
-  ClipboardList,
+  ChevronDown,
+  CheckCircle2,
+  FileText,
   Image,
   Loader2,
+  MessageCircle,
   Mic,
   PlayCircle,
-  Sparkles,
+  Target,
   Wand2
 } from "lucide-react";
-import type { LessonPlan, Rehearsal, VisualPack } from "./types";
+import type { LessonBrief, LessonOption, LessonOptionsResponse, LessonPlan, Rehearsal, VisualPack } from "./types";
 
 type FormState = {
   topic: string;
-  duration: string;
-  classSize: string;
-  studentAge: string;
-  teachingStyle: string;
   outcome: string;
   classContext: string;
   voiceNotes: string;
 };
 
+type TranscriptEntry = {
+  id: string;
+  role: "educator" | "planner" | "system";
+  text: string;
+};
+
 const initialForm: FormState = {
   topic: "Compassion in daily life",
-  duration: "90 minutes",
-  classSize: "4",
-  studentAge: "13",
-  teachingStyle: "Play-based learning and scaffolded self-directed learning",
   outcome: "Students can notice suffering in everyday situations and choose one compassionate response.",
   classContext: "Students are energetic and enjoy role-play, but they can struggle to connect teachings to school life.",
   voiceNotes: "Next week I want to teach compassion, but my students are restless and I want an activity."
@@ -76,27 +77,57 @@ function Section({
   );
 }
 
+function describeRealtimeError(err: unknown) {
+  if (err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "SecurityError")) {
+    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type brief instead\".";
+  }
+
+  if (err instanceof DOMException && err.name === "NotFoundError") {
+    return "No microphone was found. Connect or enable a microphone, or use \"Type brief instead\".";
+  }
+
+  if (err instanceof Error && /permission denied|notallowed/i.test(err.message)) {
+    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type brief instead\".";
+  }
+
+  return err instanceof Error ? err.message : "Could not start realtime voice session";
+}
+
 export default function App() {
   const [form, setForm] = useState<FormState>(initialForm);
+  const [brief, setBrief] = useState<LessonBrief | null>(null);
+  const [lessonOptions, setLessonOptions] = useState<LessonOption[]>([]);
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
   const [lesson, setLesson] = useState<LessonPlan | null>(null);
   const [visuals, setVisuals] = useState<VisualPack | null>(null);
   const [rehearsal, setRehearsal] = useState<Rehearsal | null>(null);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showTypedBrief, setShowTypedBrief] = useState(false);
   const [realtimeStatus, setRealtimeStatus] = useState<"idle" | "connecting" | "live">("idle");
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const realtimePeer = useRef<RTCPeerConnection | null>(null);
   const realtimeStream = useRef<MediaStream | null>(null);
   const realtimeAudio = useRef<HTMLAudioElement | null>(null);
+  const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const outputRef = useRef<HTMLDivElement | null>(null);
+  const visualPackRef = useRef<HTMLDivElement | null>(null);
 
   const requestPayload = useMemo(
     () => ({
       ...form,
       tradition: "Chinese Mahayana folk Buddhism",
+      studentAge: "13",
+      classSize: "4",
+      duration: "90 minutes",
+      teachingStyle: "Play-based learning and scaffolded self-directed learning",
       requiredScaffold: "Gradual release of responsibility: I do, We do, You do",
+      selectedOption: selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex],
       safety: "Educator-facing draft. No unsupervised student-agent interaction."
     }),
-    [form]
+    [form, lessonOptions, selectedOptionIndex]
   );
 
   const update = (field: keyof FormState, value: string) => {
@@ -120,11 +151,62 @@ export default function App() {
     }
   };
 
-  const generateLesson = () =>
-    run("lesson", () => postJson<LessonPlan>("/api/lesson", requestPayload), setLesson);
+  const generateBrief = () => {
+    setBrief(null);
+    setLesson(null);
+    setVisuals(null);
+    setRehearsal(null);
+    outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return run("brief", () => postJson<LessonBrief>("/api/brief", requestPayload), setBrief);
+  };
 
-  const generateVisuals = () =>
-    run("visuals", () => postJson<VisualPack>("/api/visuals", { ...requestPayload, lesson }), setVisuals);
+  const generateOptions = () => {
+    setLessonOptions([]);
+    setSelectedOptionIndex(null);
+    setBrief(null);
+    setLesson(null);
+    setVisuals(null);
+    setRehearsal(null);
+    outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return run("options", () => postJson<LessonOptionsResponse>("/api/options", requestPayload), (result) => {
+      setLessonOptions(result.options);
+    });
+  };
+
+  const selectOption = (index: number) => {
+    setSelectedOptionIndex(index);
+    setBrief(null);
+    setLesson(null);
+    setVisuals(null);
+    setRehearsal(null);
+  };
+
+  const updateBrief = () =>
+    brief
+      ? run(
+          "brief-update",
+          () => postJson<LessonBrief>("/api/brief/update", { context: requestPayload, brief, feedback }),
+          (updatedBrief) => {
+            setBrief(updatedBrief);
+            setLesson(null);
+            setVisuals(null);
+            setRehearsal(null);
+            setFeedback("");
+          }
+        )
+      : undefined;
+
+  const generateLesson = () => {
+    setLesson(null);
+    outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return run("lesson", () => postJson<LessonPlan>("/api/lesson", { ...requestPayload, brief }), setLesson);
+  };
+
+  const generateVisuals = () => {
+    setVisuals(null);
+    window.setTimeout(() => visualPackRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+    return run("visuals", () => postJson<VisualPack>("/api/visuals", { ...requestPayload, brief, lesson }), setVisuals);
+  };
 
   const generateRehearsal = () =>
     run(
@@ -132,7 +214,8 @@ export default function App() {
       () =>
         postJson<Rehearsal>("/api/rehearsal", {
           ...requestPayload,
-          rehearsalPrompt: `Pretend you are a skeptical ${form.studentAge}-year-old. Ask hard questions about ${form.topic}.`
+          brief,
+          rehearsalPrompt: `Pretend you are a skeptical 13-year-old. Ask hard questions about ${form.topic}.`
         }),
       setRehearsal
     );
@@ -157,6 +240,39 @@ export default function App() {
     setRealtimeStatus("idle");
   };
 
+  const addTranscript = (entry: Omit<TranscriptEntry, "id">) => {
+    setTranscript((current) => [
+      ...current,
+      {
+        ...entry,
+        id: `${Date.now()}-${current.length}`
+      }
+    ]);
+    window.setTimeout(() => transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }), 0);
+  };
+
+  const handleRealtimeEvent = (event: MessageEvent<string>) => {
+    try {
+      const data = JSON.parse(event.data);
+      const text =
+        data.transcript ||
+        data.delta ||
+        data.item?.content?.[0]?.transcript ||
+        data.item?.content?.[0]?.text ||
+        data.response?.output?.[0]?.content?.[0]?.transcript ||
+        data.response?.output?.[0]?.content?.[0]?.text;
+
+      if (!text || typeof text !== "string") {
+        return;
+      }
+
+      const role = data.item?.role === "user" || data.role === "user" ? "educator" : "planner";
+      addTranscript({ role, text });
+    } catch {
+      // Realtime event shapes can vary. Ignore non-JSON or non-transcript events.
+    }
+  };
+
   const startRealtime = async () => {
     if (realtimeStatus === "live") {
       stopRealtime();
@@ -165,6 +281,11 @@ export default function App() {
 
     setRealtimeStatus("connecting");
     setError(null);
+    setTranscript([]);
+    addTranscript({
+      role: "system",
+      text: "Starting voice interview. Allow microphone access if your browser asks."
+    });
     try {
       const tokenResponse = await fetch("/api/realtime/client-secret", {
         method: "POST",
@@ -196,7 +317,12 @@ export default function App() {
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
 
       const channel = peer.createDataChannel("oai-events");
+      channel.addEventListener("message", handleRealtimeEvent);
       channel.addEventListener("open", () => {
+        addTranscript({
+          role: "system",
+          text: "Connected. The planner will ask clarifying questions one at a time."
+        });
         channel.send(
           JSON.stringify({
             type: "conversation.item.create",
@@ -235,9 +361,13 @@ export default function App() {
         sdp: await sdpResponse.text()
       });
       setRealtimeStatus("live");
+      addTranscript({
+        role: "system",
+        text: "Voice interview is live. Speak naturally; the transcript will appear here when text events are available."
+      });
     } catch (err) {
       stopRealtime();
-      setError(err instanceof Error ? err.message : "Could not start realtime voice session");
+      setError(describeRealtimeError(err));
     }
   };
 
@@ -246,102 +376,370 @@ export default function App() {
       <header className="topbar">
         <div>
           <p className="eyebrow">Lesson Planner Q</p>
-          <h1>Weekly Buddhist lesson preparation studio</h1>
+          <h1>Weekly Lesson Planner</h1>
           <p className="lede">
             Generate structured lesson plans, rehearse tricky explanations, and prepare printable visual materials for a
             small class of 13-year-old students.
           </p>
         </div>
-        <div className="status-pill">
-          <Sparkles size={18} />
-          Educator-facing MVP
-        </div>
       </header>
 
       <div className="workspace">
-        <aside className="sidebar" aria-label="Lesson setup">
-          <div className="sidebar-head">
-            <ClipboardList size={20} />
-            <h2>Lesson Setup</h2>
-          </div>
-
-          <label>
-            Topic
-            <input value={form.topic} onChange={(event) => update("topic", event.target.value)} />
-          </label>
-
-          <div className="field-grid">
-            <label>
-              Age
-              <input value={form.studentAge} onChange={(event) => update("studentAge", event.target.value)} />
-            </label>
-            <label>
-              Class size
-              <input value={form.classSize} onChange={(event) => update("classSize", event.target.value)} />
-            </label>
-          </div>
-
-          <label>
-            Duration
-            <input value={form.duration} onChange={(event) => update("duration", event.target.value)} />
-          </label>
-
-          <label>
-            Teaching style
-            <input value={form.teachingStyle} onChange={(event) => update("teachingStyle", event.target.value)} />
-          </label>
-
-          <label>
-            Desired outcome
-            <textarea value={form.outcome} onChange={(event) => update("outcome", event.target.value)} rows={4} />
-          </label>
-
-          <label>
-            Class context
-            <textarea
-              value={form.classContext}
-              onChange={(event) => update("classContext", event.target.value)}
-              rows={4}
-            />
-          </label>
-
-          <label>
-            Voice planning notes
-            <textarea value={form.voiceNotes} onChange={(event) => update("voiceNotes", event.target.value)} rows={4} />
-          </label>
-
-          <div className="action-stack">
-            <button onClick={startRealtime} disabled={realtimeStatus === "connecting"}>
+        <section className="brief-composer" aria-label="Lesson input">
+          <section className="voice-first">
+            <span className="voice-orb">
+              <Mic size={26} />
+            </span>
+            <div>
+              <h2>Start by voice</h2>
+              <p>Talk through the lesson idea, class context, and what you want students to take away.</p>
+            </div>
+            <button onClick={startRealtime} disabled={realtimeStatus === "connecting"} className="voice-primary">
               {realtimeStatus === "connecting" ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
-              {realtimeStatus === "live" ? "Stop voice coach" : "Start voice coach"}
+              {realtimeStatus === "live" ? "Stop interview" : "Start voice interview"}
             </button>
-            <button onClick={generateLesson} disabled={Boolean(loading)} className="primary">
-              {loading === "lesson" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
-              Generate lesson
-            </button>
-            <button onClick={generateRehearsal} disabled={Boolean(loading)}>
-              {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
-              Rehearsal coach
-            </button>
-            <button onClick={generateVisuals} disabled={Boolean(loading)}>
-              {loading === "visuals" ? <Loader2 className="spin" size={18} /> : <Image size={18} />}
-              Visual pack
-            </button>
-          </div>
-        </aside>
+          </section>
 
-        <div className="content">
+          <button className="typed-toggle compact-toggle" onClick={() => setShowTypedBrief((current) => !current)}>
+            <span>Type brief instead</span>
+            <ChevronDown className={showTypedBrief ? "rotate" : ""} size={18} />
+          </button>
+
+          {showTypedBrief && (
+            <div className="typed-brief">
+              <label>
+                Topic
+                <input value={form.topic} onChange={(event) => update("topic", event.target.value)} />
+              </label>
+
+              <label>
+                <Target size={16} />
+                Desired outcome
+                <textarea value={form.outcome} onChange={(event) => update("outcome", event.target.value)} rows={4} />
+              </label>
+
+              <label>
+                <MessageCircle size={16} />
+                Class context
+                <textarea
+                  value={form.classContext}
+                  onChange={(event) => update("classContext", event.target.value)}
+                  rows={4}
+                />
+              </label>
+
+              <label>
+                <Mic size={16} />
+                Voice planning notes
+                <textarea
+                  value={form.voiceNotes}
+                  onChange={(event) => update("voiceNotes", event.target.value)}
+                  rows={4}
+                />
+              </label>
+
+              <div className="typed-actions">
+                <button onClick={generateOptions} disabled={Boolean(loading)}>
+                  {loading === "options" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+                  Review lesson options
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {realtimeStatus !== "idle" && (
+          <section className="transcript-panel" aria-live="polite">
+            <div>
+              <h2>Voice interview transcript</h2>
+              <p>{realtimeStatus === "connecting" ? "Connecting to the planner..." : "Follow the conversation here."}</p>
+            </div>
+            <div className="transcript-log" ref={transcriptRef}>
+              {transcript.map((entry) => (
+                <article className={entry.role} key={entry.id}>
+                  <strong>{entry.role === "educator" ? "Educator" : entry.role === "planner" ? "Planner" : "System"}</strong>
+                  <p>{entry.text}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="content" ref={outputRef}>
           {error && <div className="error">{error}</div>}
 
-          {!lesson && !visuals && !rehearsal && (
+          {loading === "options" && (
+            <section className="panel drafting-state" aria-live="polite">
+              <div className="section-title">
+                <Loader2 className="spin" size={22} />
+                <h2>Generating lesson options</h2>
+              </div>
+              <p>Creating distinct ways to run the 90-minute lesson so you can compare before choosing.</p>
+              <div className="draft-preview" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            </section>
+          )}
+
+          {(loading === "brief" || loading === "brief-update") && (
+            <section className="panel drafting-state" aria-live="polite">
+              <div className="section-title">
+                <Loader2 className="spin" size={22} />
+                <h2>{loading === "brief-update" ? "Updating the lesson brief" : "Generating the lesson brief"}</h2>
+              </div>
+              <p>
+                Turning the voice interview into a structured brief, clarifying questions, and recommended next steps.
+              </p>
+              <div className="draft-preview" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            </section>
+          )}
+
+          {loading === "lesson" && (
+            <section className="panel drafting-state" aria-live="polite">
+              <div className="section-title">
+                <Loader2 className="spin" size={22} />
+                <h2>Drafting the 90-minute lesson plan</h2>
+              </div>
+              <p>
+                Building the teaching anchor, play activity, self-directed scaffold, reflection prompts, and educator
+                review notes.
+              </p>
+              <div className="draft-preview" aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+            </section>
+          )}
+
+          {!brief &&
+            !lessonOptions.length &&
+            !lesson &&
+            !visuals &&
+            !rehearsal &&
+            loading !== "lesson" &&
+            loading !== "brief" &&
+            loading !== "options" && (
             <section className="empty-state">
               <BookOpen size={32} />
-              <h2>Start with a weekly topic</h2>
+              <h2>Start with the voice interview</h2>
               <p>
-                The first flow creates a classroom-ready draft with a teaching anchor, play activity, self-directed
-                scaffold, educator notes, and review reminders.
+                The planner will ask clarifying questions, generate a brief, collect your feedback, then guide you to
+                visuals, rehearsal, and the full 90-minute lesson plan.
               </p>
             </section>
+          )}
+
+          {lessonOptions.length > 0 && (
+            <Section title="Review lesson options" icon={<FileText size={22} />}>
+              <p className="muted">
+                Compare the approaches, pick the one that best fits the class, then generate a brief from that option.
+              </p>
+              <div className="option-grid">
+                {lessonOptions.map((option, index) => (
+                  <article className={selectedOptionIndex === index ? "selected" : ""} key={`${option.title}-${index}`}>
+                    <div>
+                      <span className="option-kicker">Option {index + 1}</span>
+                      <h3>{option.title}</h3>
+                      <p>{option.approach}</p>
+                    </div>
+                    <div>
+                      <strong>Best for</strong>
+                      <p>{option.bestFor}</p>
+                    </div>
+                    <div>
+                      <strong>Activities</strong>
+                      <List items={option.activities} />
+                    </div>
+                    <div>
+                      <strong>Tradeoffs</strong>
+                      <List items={option.tradeoffs} />
+                    </div>
+                    <button onClick={() => selectOption(index)}>
+                      {selectedOptionIndex === index ? <CheckCircle2 size={18} /> : <FileText size={18} />}
+                      {selectedOptionIndex === index ? "Selected" : "Select"}
+                    </button>
+                  </article>
+                ))}
+              </div>
+              <div className="inline-actions">
+                <button onClick={generateBrief} disabled={Boolean(loading) || selectedOptionIndex === null}>
+                  {loading === "brief" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+                  Generate brief from selected option
+                </button>
+              </div>
+            </Section>
+          )}
+
+          {brief && (
+            <Section title={brief.title} icon={<FileText size={22} />}>
+              <div className="next-steps" aria-label="Lesson planning next steps">
+                <h3>Next steps</h3>
+                <ol>
+                  <li className="done">
+                    <CheckCircle2 size={16} />
+                    <span>
+                      <strong>Brief created</strong>
+                      <small>Review the draft and answer clarifying questions.</small>
+                    </span>
+                  </li>
+                  <li className={visuals ? "done" : "active"}>
+                    <span className="step-number">2</span>
+                    <span>
+                      <strong>{brief.visualPackRecommended ? "Generate visual pack" : "Visual pack is optional"}</strong>
+                      <small>Appears below this brief when generated.</small>
+                    </span>
+                  </li>
+                  <li className={rehearsal ? "done" : ""}>
+                    <span className="step-number">3</span>
+                    <span>
+                      <strong>Practise with rehearsal coach</strong>
+                      <small>Use feedback from practice to update the brief.</small>
+                    </span>
+                  </li>
+                  <li className={lesson ? "done" : ""}>
+                    <span className="step-number">4</span>
+                    <span>
+                      <strong>Generate full lesson plan</strong>
+                      <small>Use the revised brief as the source of truth.</small>
+                    </span>
+                  </li>
+                </ol>
+              </div>
+
+              <p>{brief.briefSummary}</p>
+              <div className="two-col">
+                <div>
+                  <h3>Student Takeaway</h3>
+                  <p>{brief.studentTakeaway}</p>
+                </div>
+                <div>
+                  <h3>Clarifying Questions</h3>
+                  <List items={brief.clarifyingQuestions} />
+                </div>
+              </div>
+
+              <div className="two-col">
+                <div>
+                  <h3>Key Choices</h3>
+                  <List items={brief.keyChoices} />
+                </div>
+                <div>
+                  <h3>Suggested Structure</h3>
+                  <List items={brief.suggestedStructure} />
+                </div>
+              </div>
+
+              <div className="recommendation-grid">
+                <article>
+                  <strong>{brief.visualPackRecommended ? "Visual pack recommended" : "Visual pack optional"}</strong>
+                  <p>{brief.visualPackRationale}</p>
+                  <button onClick={generateVisuals} disabled={Boolean(loading)}>
+                    {loading === "visuals" ? <Loader2 className="spin" size={18} /> : <Image size={18} />}
+                    Generate visual pack
+                  </button>
+                </article>
+                <article>
+                  <strong>{brief.rehearsalRecommended ? "Rehearsal recommended" : "Rehearsal optional"}</strong>
+                  <p>{brief.rehearsalFocus}</p>
+                  <button onClick={generateRehearsal} disabled={Boolean(loading)}>
+                    {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
+                    Practice with coach
+                  </button>
+                </article>
+              </div>
+
+              <div className="embedded-output" ref={visualPackRef}>
+                {loading === "visuals" && (
+                  <section className="drafting-state inline-draft" aria-live="polite">
+                    <div className="section-title">
+                      <Loader2 className="spin" size={20} />
+                      <h3>Generating visual pack</h3>
+                    </div>
+                    <p>Creating story cards, scenario cards, storyboard panels, and worksheet prompts for this brief.</p>
+                    <div className="draft-preview" aria-hidden="true">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </section>
+                )}
+
+                {visuals && (
+                  <section className="inline-result">
+                    <div className="section-title">
+                      <Image size={20} />
+                      <h3>{visuals.packTitle}</h3>
+                    </div>
+                    <p>{visuals.styleGuidance}</p>
+                    <div className="image-prompt">
+                      <p>{visuals.imagePrompt}</p>
+                      <button onClick={generateImage} disabled={Boolean(loading)}>
+                        {loading === "image" ? <Loader2 className="spin" size={18} /> : <PlayCircle size={18} />}
+                        Generate image
+                      </button>
+                    </div>
+                    {generatedImage && (
+                      <div className="generated-image">
+                        <img src={generatedImage} alt="Generated lesson visual" />
+                      </div>
+                    )}
+                    <div className="two-col">
+                      <div>
+                        <h3>Scenario Cards</h3>
+                        <List items={visuals.scenarioCards} />
+                      </div>
+                      <div>
+                        <h3>Value Cards</h3>
+                        <List items={visuals.valueCards} />
+                      </div>
+                    </div>
+                    <h3>Storyboard Panels</h3>
+                    <div className="cards-grid">
+                      {visuals.storyboardPanels.map((panel, index) => (
+                        <article key={`${panel.panel}-${index}`}>
+                          <strong>{panel.panel}</strong>
+                          <p>{panel.caption}</p>
+                          <span>{panel.studentPrompt}</span>
+                        </article>
+                      ))}
+                    </div>
+                    <h3>Worksheet Prompts</h3>
+                    <List items={visuals.worksheetPrompts} />
+                  </section>
+                )}
+              </div>
+
+              <label className="feedback-box">
+                Educator feedback and changes
+                <textarea
+                  value={feedback}
+                  onChange={(event) => setFeedback(event.target.value)}
+                  rows={4}
+                  placeholder="Answer clarifying questions, adjust the activity, change the tone, or add notes from rehearsal."
+                />
+              </label>
+
+              <div className="inline-actions">
+                <button onClick={updateBrief} disabled={Boolean(loading) || !feedback.trim()}>
+                  {loading === "brief-update" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+                  Update brief
+                </button>
+                <button onClick={generateLesson} disabled={Boolean(loading)}>
+                  {loading === "lesson" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
+                  Generate full lesson plan
+                </button>
+              </div>
+            </Section>
           )}
 
           {lesson && (
@@ -419,45 +817,6 @@ export default function App() {
             </Section>
           )}
 
-          {visuals && (
-            <Section title={visuals.packTitle} icon={<Image size={22} />}>
-              <p>{visuals.styleGuidance}</p>
-              <div className="image-prompt">
-                <p>{visuals.imagePrompt}</p>
-                <button onClick={generateImage} disabled={Boolean(loading)}>
-                  {loading === "image" ? <Loader2 className="spin" size={18} /> : <PlayCircle size={18} />}
-                  Generate image
-                </button>
-              </div>
-              {generatedImage && (
-                <div className="generated-image">
-                  <img src={generatedImage} alt="Generated lesson visual" />
-                </div>
-              )}
-              <div className="two-col">
-                <div>
-                  <h3>Scenario Cards</h3>
-                  <List items={visuals.scenarioCards} />
-                </div>
-                <div>
-                  <h3>Value Cards</h3>
-                  <List items={visuals.valueCards} />
-                </div>
-              </div>
-              <h3>Storyboard Panels</h3>
-              <div className="cards-grid">
-                {visuals.storyboardPanels.map((panel, index) => (
-                  <article key={`${panel.panel}-${index}`}>
-                    <strong>{panel.panel}</strong>
-                    <p>{panel.caption}</p>
-                    <span>{panel.studentPrompt}</span>
-                  </article>
-                ))}
-              </div>
-              <h3>Worksheet Prompts</h3>
-              <List items={visuals.worksheetPrompts} />
-            </Section>
-          )}
         </div>
       </div>
     </main>

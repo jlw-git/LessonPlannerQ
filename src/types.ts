@@ -30,6 +30,36 @@ export type LessonPlan = {
   reviewNotes: string[];
 };
 
+export type LessonBrief = {
+  title: string;
+  briefSummary: string;
+  studentTakeaway: string;
+  clarifyingQuestions: string[];
+  keyChoices: string[];
+  suggestedStructure: string[];
+  visualPackRecommended: boolean;
+  visualPackRationale: string;
+  rehearsalRecommended: boolean;
+  rehearsalFocus: string;
+  changeLog: string[];
+  reviewPrompts: string[];
+};
+
+export type LessonOption = {
+  title: string;
+  approach: string;
+  bestFor: string;
+  lessonShape: string[];
+  activities: string[];
+  tradeoffs: string[];
+  visualPackRecommended: boolean;
+  rehearsalFocus: string;
+};
+
+export type LessonOptionsResponse = {
+  options: LessonOption[];
+};
+
 export type VisualPack = {
   packTitle: string;
   imagePrompt: string;
