@@ -575,24 +575,6 @@ export default function App() {
             </section>
           )}
 
-          {!brief &&
-            !lessonOptions.length &&
-            !lesson &&
-            !visuals &&
-            !rehearsal &&
-            loading !== "lesson" &&
-            loading !== "brief" &&
-            loading !== "options" && (
-            <section className="empty-state">
-              <BookOpen size={32} />
-              <h2>Start with the voice interview</h2>
-              <p>
-                The planner will ask clarifying questions, generate a brief, collect your feedback, then guide you to
-                visuals, rehearsal, and the full 90-minute lesson plan.
-              </p>
-            </section>
-          )}
-
           {lessonOptions.length > 0 && (
             <Section title="Review lesson options" icon={<FileText size={22} />}>
               <p className="muted">
