@@ -1991,3 +1991,370 @@ button:focus-visible {
     padding: 20px;
   }
 }
+
+/* Linear planning workflow pass */
+.workflow-rail {
+  align-items: stretch;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 20px auto 0;
+  padding: 0 clamp(20px, 4vw, 32px);
+  width: min(1120px, 100%);
+}
+
+.workflow-step {
+  align-items: start;
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 76px;
+  padding: 10px;
+}
+
+.workflow-step strong,
+.workflow-step small {
+  display: block;
+}
+
+.workflow-step strong {
+  font-size: 0.86rem;
+  line-height: 1.2;
+}
+
+.workflow-step small {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 620;
+  line-height: 1.3;
+  margin-top: 3px;
+}
+
+.workflow-step.active {
+  background: var(--surface-raised);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(0, 122, 255, 0.1);
+}
+
+.workflow-step.done {
+  background: var(--success-soft);
+  border-color: rgba(36, 138, 61, 0.24);
+}
+
+.workflow-marker {
+  align-items: center;
+  background: #f7f7f9;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 850;
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.workflow-step.active .workflow-marker {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.workflow-step.done .workflow-marker {
+  background: var(--success);
+  border-color: var(--success);
+  color: #fff;
+}
+
+.start-grid {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+  padding-top: 20px;
+}
+
+.voice-card,
+.fallback-card {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.voice-card {
+  align-content: start;
+  border-color: rgba(0, 122, 255, 0.18);
+  box-shadow: 0 14px 34px rgba(0, 122, 255, 0.08);
+}
+
+.voice-card.has-error {
+  border-color: rgba(215, 0, 21, 0.22);
+}
+
+.start-card-head,
+.panel-heading {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.panel-heading {
+  margin-bottom: 2px;
+}
+
+.section-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.section-eyebrow {
+  color: var(--accent);
+  display: block;
+  font-size: 0.74rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+
+.voice-status,
+.fallback-badge,
+.saved-count {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 0.73rem;
+  font-weight: 850;
+  min-height: 28px;
+  padding: 5px 9px;
+}
+
+.voice-status {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.voice-status.connecting {
+  background: var(--gold-soft);
+  color: #6d4300;
+}
+
+.voice-status.listening,
+.voice-status.speaking {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.voice-status.permission-error,
+.voice-status.api-error {
+  background: #fff2f4;
+  color: var(--warning);
+}
+
+.fallback-badge,
+.saved-count {
+  background: #f7f7f9;
+  color: var(--muted);
+}
+
+.voice-state-meter {
+  align-items: end;
+  display: flex;
+  gap: 5px;
+  height: 34px;
+}
+
+.voice-state-meter span {
+  background: linear-gradient(180deg, rgba(0, 122, 255, 0.82), rgba(36, 138, 61, 0.72));
+  border-radius: 999px;
+  display: block;
+  height: 18px;
+  width: 7px;
+}
+
+.voice-state-meter span:nth-child(2) {
+  height: 28px;
+}
+
+.voice-state-meter span:nth-child(3) {
+  height: 12px;
+}
+
+.voice-card .voice-primary {
+  justify-self: start;
+}
+
+.fallback-card.typed-brief {
+  box-shadow: none;
+  padding: 18px;
+}
+
+.notice-content {
+  padding-bottom: 0;
+}
+
+.status-notice {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.status-notice p {
+  font-weight: 650;
+  line-height: 1.45;
+  margin: 4px 0 0;
+}
+
+.guided-empty {
+  min-height: 240px;
+}
+
+.option-compare-list,
+.scaffold-list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+}
+
+.option-compare-list div,
+.scaffold-list div {
+  background: #fbfbfd;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px;
+}
+
+.option-compare-list dt,
+.scaffold-list dt,
+.brief-hero span,
+.lesson-overview span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.option-compare-list dd,
+.scaffold-list dd {
+  line-height: 1.35;
+  margin: 4px 0 0;
+}
+
+.option-card-actions {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+}
+
+.brief-hero,
+.lesson-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.brief-hero {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.brief-hero.single {
+  grid-template-columns: 1fr;
+}
+
+.brief-hero > div,
+.lesson-overview article {
+  background: var(--surface-tint);
+  border: 1px solid rgba(0, 122, 255, 0.16);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.brief-hero p,
+.lesson-overview p {
+  line-height: 1.5;
+  margin: 6px 0 0;
+}
+
+.lesson-overview {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.timeline article {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.timeline article p {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 900px) {
+  .workflow-rail {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(178px, 1fr);
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .start-grid,
+  .brief-hero,
+  .lesson-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .start-card-head,
+  .panel-heading {
+    display: grid;
+  }
+
+  .section-actions {
+    justify-content: stretch;
+  }
+
+  .section-actions button,
+  .inline-actions button,
+  .voice-card .voice-primary {
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    padding: 24px 18px 28px;
+  }
+
+  h1 {
+    font-size: clamp(2.25rem, 13vw, 3.1rem);
+  }
+
+  .brief-composer.feature-section,
+  .content,
+  .workflow-rail {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .brief-composer.feature-section,
+  .panel,
+  .empty-state,
+  .error {
+    border-radius: 10px;
+    padding: 18px;
+  }
+
+  .voice-card,
+  .fallback-card {
+    padding: 16px;
+  }
+}
