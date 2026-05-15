@@ -276,6 +276,11 @@ export default function App() {
       status: lesson ? "done" : loading === "lesson" ? "active" : "idle"
     },
     {
+      label: "Visuals",
+      detail: visuals ? "Material pack ready" : "Cards and prompts",
+      status: visuals ? "done" : loading === "visuals" || loading === "image" ? "active" : "idle"
+    },
+    {
       label: "Reflection",
       detail: reflections.length > 0 ? `${reflections.length} saved` : "Log what happened",
       status: showLessonMemory ? "active" : "idle"
@@ -711,21 +716,60 @@ export default function App() {
     }
   };
 
-  return (
-    <main>
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Lesson Planner Q</p>
-          <h1>Weekly Lesson Planner</h1>
-          <p className="lede">
-            Generate lesson plans, rehearse tricky explanations, and log reflections after each lesson to improve future
-            lessons.
-          </p>
-        </div>
-      </header>
+  const selectedOption = selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex] ?? null;
+  const currentFocus = brief?.title || selectedOption?.title || form.topic;
+  const hasPlanContext = Boolean(brief || selectedOption || lessonOptions.length > 0);
 
-      <div className="workspace">
+  return (
+    <main className="app-shell">
+      <aside className="app-sidebar">
+        <div className="brand-lockup">
+          <span className="brand-mark">
+            <BookOpen size={22} />
+          </span>
+          <strong>Lesson Planner Q</strong>
+        </div>
         <WorkflowRail steps={workflowSteps} />
+        <div className="sidebar-footer">
+          <span>Educator workspace</span>
+          <strong>{reflections.length} saved reflections</strong>
+        </div>
+      </aside>
+
+      <div className="planner-workspace">
+        <header className="workspace-header">
+          <div>
+            <div className="topic-line">
+              <h1>{currentFocus}</h1>
+              <button
+                className="icon-button quiet-button"
+                aria-label="Edit lesson topic"
+                onClick={() => document.querySelector<HTMLInputElement>("input")?.focus()}
+              >
+                <Pencil size={16} />
+              </button>
+            </div>
+            <div className="context-chips" aria-label="Lesson context">
+              <span>90 min</span>
+              <span>Age 13</span>
+              <span>Small class</span>
+              <span>Chinese Mahayana folk Buddhism</span>
+            </div>
+          </div>
+          <div className="header-actions">
+            <button className="quiet-button" onClick={() => setShowLessonMemory(true)}>
+              <NotebookPen size={18} />
+              Lesson memory
+            </button>
+            <button onClick={generateOptions} disabled={Boolean(loading)} className="primary">
+              {loading === "options" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
+              Generate options
+            </button>
+          </div>
+        </header>
+
+        <div className="planner-grid">
+          <section className="planner-main">
 
         {realtimeStatus === "idle" && (
           <section className="brief-composer feature-section" aria-label="Start lesson plan">
@@ -1443,6 +1487,72 @@ export default function App() {
             </Section>
           )}
 
+        </div>
+          </section>
+
+          <aside className="context-panel" aria-label="Planning shortcuts">
+            <section className="context-card">
+              <div className="context-card-head">
+                <div className="section-title compact">
+                  <NotebookPen size={20} />
+                  <h2>Lesson memory</h2>
+                </div>
+                <span>{reflections.length}</span>
+              </div>
+              <p>Recent reflections become classroom evidence for the next plan.</p>
+              <button className="context-action" onClick={() => setShowLessonMemory((current) => !current)}>
+                <Save size={18} />
+                {showLessonMemory ? "Hide memory form" : "Log reflection"}
+              </button>
+            </section>
+
+            <section className="context-card">
+              <div className="context-card-head">
+                <div className="section-title compact">
+                  <Mic size={20} />
+                  <h2>Rehearse</h2>
+                </div>
+                <span>{rehearsal ? "Ready" : "Next"}</span>
+              </div>
+              <p>Practice likely student questions before turning the brief into a full plan.</p>
+              <button className="context-action" onClick={generateRehearsal} disabled={Boolean(loading) || !hasPlanContext}>
+                {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <MessageCircle size={18} />}
+                Start rehearsal
+              </button>
+            </section>
+
+            <section className="context-card">
+              <div className="context-card-head">
+                <div className="section-title compact">
+                  <CheckCircle2 size={20} />
+                  <h2>Next actions</h2>
+                </div>
+              </div>
+              <div className="next-action-list">
+                <button onClick={generateBrief} disabled={Boolean(loading) || selectedOptionIndex === null}>
+                  <FileText size={18} />
+                  <span>
+                    <strong>Draft brief</strong>
+                    <small>{brief ? "Refresh the current brief" : "Use the selected option"}</small>
+                  </span>
+                </button>
+                <button onClick={generateLesson} disabled={Boolean(loading) || !brief}>
+                  <BookOpen size={18} />
+                  <span>
+                    <strong>Draft full plan</strong>
+                    <small>Create the 90-minute lesson</small>
+                  </span>
+                </button>
+                <button onClick={generateVisuals} disabled={Boolean(loading) || !brief}>
+                  <Image size={18} />
+                  <span>
+                    <strong>Create visuals</strong>
+                    <small>Cards, prompts, and image direction</small>
+                  </span>
+                </button>
+              </div>
+            </section>
+          </aside>
         </div>
       </div>
     </main>

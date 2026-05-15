@@ -33,5 +33,14 @@ The web app runs at [http://127.0.0.1:5173](http://127.0.0.1:5173), and the API 
 
 ## Product Docs
 
+- [Living Project Notes](./PROJECT.md)
+- [Agent Instructions](./AGENTS.md)
 - [Working Backwards One-Pager](./ai-lesson-planner-working-backwards.md)
 - [Product Requirements Document](./ai-lesson-planner-prd.md)
+
+## How To Use These Docs
+
+- Use `PROJECT.md` to understand the current state of the app: how it is built, how it works, important files, API routes, model usage, and known implementation gaps.
+- Use `AGENTS.md` to give AI coding assistants repo-specific working instructions.
+- Use `ai-lesson-planner-prd.md` to understand product intent: the target user, problem, requirements, desired behavior, and roadmap-level decisions.
+- Use `ai-lesson-planner-working-backwards.md` to understand the product story and positioning.
