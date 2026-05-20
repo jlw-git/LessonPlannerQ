@@ -31,6 +31,7 @@ The current teaching context assumes:
 - Generate rehearsal coaching for difficult student questions and simpler educator language.
 - Start a Realtime voice planning session through an ephemeral client secret.
 - Save after-class lesson reflections in browser local storage and include recent reflections as planning memory for future outputs.
+- Run local evals against the real Express API routes to check schema contracts and product guardrails.
 
 ## How It Is Built
 
@@ -52,6 +53,29 @@ Default model environment variables are:
 
 Prompt caching is configured in `server/index.mjs` with a stable shared instruction prefix and `OPENAI_PROMPT_CACHE_RETENTION`.
 
+## LLM vs Rules-Based Responsibilities
+
+Lesson Planner Q should be described as a hybrid system: LLMs draft educator-facing content, while the app supplies workflow structure, constraints, storage, and validation.
+
+LLM-backed behavior:
+
+- `/api/options` asks the text model to generate exactly three comparable lesson approaches.
+- `/api/brief` and `/api/brief/update` ask the text model to draft or revise structured lesson briefs.
+- `/api/lesson` asks the text model to draft the full 90-minute lesson plan.
+- `/api/visuals` asks the text model to draft printable material guidance, story/scenario cards, worksheet prompts, storyboard panels, review notes, and the image prompt.
+- `/api/rehearsal` asks the text model to generate likely student questions, simpler language, suggested responses, and coaching notes.
+- `/api/image` uses the image model to render one lesson visual from the visual pack prompt.
+- `/api/realtime/client-secret` creates a Realtime session for educator-facing voice planning or rehearsal.
+
+Rules-based and deterministic behavior:
+
+- The React app owns the planning workflow, button availability, selected option state, loading states, and rendering of typed artifacts.
+- Form defaults, request payload assembly, and the inclusion of up to five recent reflections in generation requests are handled in `src/App.tsx`.
+- Reflection memory is local browser state: reflections are saved to `localStorage`, capped at 20, and can be edited or deleted without an LLM call.
+- The Express server owns route boundaries, model selection from environment variables, strict JSON schema contracts, prompt-cache keys, health responses, and API error handling.
+- JSON schemas constrain the shape of model responses, but the prose content inside those schemas is still model-generated and requires educator review.
+- The eval runner and graders are deterministic checks over route responses; they do not replace human review of religious, cultural, or classroom fit.
+
 ## How It Works
 
 The main planning flow starts in `src/App.tsx`. The frontend is organized as a planning cockpit: a persistent workflow rail, a central planning workspace, and a compact context panel for lesson memory, rehearsal, and next actions.
@@ -72,6 +96,7 @@ Saved reflections are stored in browser `localStorage` under `lesson-planner-q-r
 - `src/styles.css`: application styling.
 - `server/index.mjs`: Express API server, OpenAI client setup, shared product instructions, JSON schemas, and route handlers.
 - `api/`: serverless-style API entrypoints/proxies for deployment environments.
+- `evals/`: local JSONL eval cases, deterministic graders, and a runner that exercises real API routes.
 - `README.md`: setup instructions and quick project summary.
 - `ai-lesson-planner-prd.md`: product requirements document.
 - `ai-lesson-planner-working-backwards.md`: working-backwards product framing.
@@ -89,6 +114,16 @@ Saved reflections are stored in browser `localStorage` under `lesson-planner-q-r
 - `POST /api/image`: generates one image from a visual prompt.
 - `POST /api/realtime/client-secret`: creates a short-lived realtime client secret for voice planning.
 
+## Evals
+
+Local evals live in `evals/` and run with:
+
+```bash
+npm run eval:local
+```
+
+The runner imports the Express app, starts it on an ephemeral local port, sends each JSONL case through the real route, and writes `evals/results/latest.json`. It requires `OPENAI_API_KEY` unless `--server-url` points to an already-running compatible API. Current checks cover response schemas, educator control, Chinese Mahayana folk Buddhist context, practical classroom moves, gradual release, reflection-memory use, visual cultural review, and rehearsal simplicity.
+
 ## Key Product Principles
 
 - Keep the educator in control. AI output is a draft for educator review.
@@ -103,7 +138,7 @@ Saved reflections are stored in browser `localStorage` under `lesson-planner-q-r
 - Reflection memory is local to the browser, so it does not sync across devices.
 - Generated materials are not yet exported as printable PDFs or editable document files.
 - There is no user account system or persistent database.
-- There is no automated test suite documented yet.
+- There is a focused local eval harness, but no broader unit or browser test suite yet.
 - Cultural or doctrinal review still depends on educator judgment.
 
 ## How To Run Locally
