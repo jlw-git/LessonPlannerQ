@@ -222,6 +222,7 @@ This is deferred from the core MVP unless implemented as a limited educator-only
 - Play-based activity generation.
 - Scaffolded self-directed learning generation using gradual release of responsibility: "I do, we do, you do."
 - Structured lesson brief generation and update flow.
+- Agentic critic review and one-pass revision for lesson options before educator display.
 - Full 90-minute lesson plan generation.
 - Agentic critic review and one-pass revision for full lesson plans before educator display.
 - Educator facilitation notes.
@@ -239,7 +240,6 @@ This is deferred from the core MVP unless implemented as a limited educator-only
 
 ### Deferred From MVP
 
-- Agentic critic review and one-pass revision for lesson options before educator display.
 - Live facilitation copilot, unless implemented as a limited educator-only beta.
 - Voice-based post-class reflection debrief.
 - Multi-week curriculum planning.
@@ -392,6 +392,8 @@ The agentic direction is a bounded loop: draft, critique, revise once, show the 
 LLMs should generate draft content where open-ended judgment, language, examples, and classroom adaptation are needed:
 
 - lesson option drafts
+- pedagogy critic and tradition reviewer notes for lesson options
+- one-pass lesson option revisions when the critic requests concrete changes
 - lesson brief drafts and brief revisions
 - full lesson plan drafts
 - pedagogy critic and tradition reviewer notes for full lesson plans
@@ -436,7 +438,7 @@ The target loop is:
 12. After class, reflection agent summarizes classroom evidence into memory.
 13. Next planning session starts with that memory.
 
-The implemented first build slice covers full-plan review/revision. Option review/revision, structured interview extraction, brief critique, rehearsal attempt critique, and reflection memory synthesis should remain roadmap work until that first slice is validated.
+The implemented first build slices cover option review/revision and full-plan review/revision. Structured interview extraction, brief critique, rehearsal attempt critique, and reflection memory synthesis should remain roadmap work until those review loops are validated.
 
 ### GPT Realtime 2
 

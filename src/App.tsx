@@ -27,6 +27,7 @@ import type {
   LessonOption,
   LessonOptionsResponse,
   LessonPlan,
+  OptionAgentReview,
   Rehearsal,
   VisualPack
 } from "./types";
@@ -148,18 +149,28 @@ function List({ items }: { items: string[] }) {
   );
 }
 
-function LessonAgentReviewPanel({ review }: { review: LessonAgentReview }) {
+function AgentReviewPanel({
+  review,
+  title,
+  ariaLabel,
+  noRevisionCopy
+}: {
+  review: LessonAgentReview | OptionAgentReview;
+  title: string;
+  ariaLabel: string;
+  noRevisionCopy: string;
+}) {
   const revisionItems =
     review.revisionRequired && review.revisionRequests.length > 0
       ? review.revisionRequests
-      : ["No required revision after critic review."];
+      : [noRevisionCopy];
 
   return (
-    <aside className="agent-review-panel" aria-label="Plan critic review">
+    <aside className="agent-review-panel" aria-label={ariaLabel}>
       <div className="agent-review-heading">
         <AlertCircle size={20} />
         <div>
-          <span>Plan critic review</span>
+          <span>{title}</span>
           <p>{review.summary}</p>
         </div>
       </div>
@@ -188,6 +199,28 @@ function LessonAgentReviewPanel({ review }: { review: LessonAgentReview }) {
         </div>
       )}
     </aside>
+  );
+}
+
+function LessonAgentReviewPanel({ review }: { review: LessonAgentReview }) {
+  return (
+    <AgentReviewPanel
+      review={review}
+      title="Plan critic review"
+      ariaLabel="Plan critic review"
+      noRevisionCopy="No required revision after critic review."
+    />
+  );
+}
+
+function OptionAgentReviewPanel({ review }: { review: OptionAgentReview }) {
+  return (
+    <AgentReviewPanel
+      review={review}
+      title="Option critic review"
+      ariaLabel="Option critic review"
+      noRevisionCopy="No required option revision after critic review."
+    />
   );
 }
 
@@ -277,6 +310,7 @@ export default function App() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [brief, setBrief] = useState<LessonBrief | null>(null);
   const [lessonOptions, setLessonOptions] = useState<LessonOption[]>([]);
+  const [optionReview, setOptionReview] = useState<OptionAgentReview | null>(null);
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
   const [expandedOptionIndex, setExpandedOptionIndex] = useState<number | null>(null);
   const [lesson, setLesson] = useState<LessonPlan | null>(null);
@@ -504,6 +538,7 @@ export default function App() {
 
   const generateOptions = () => {
     setLessonOptions([]);
+    setOptionReview(null);
     setSelectedOptionIndex(null);
     setExpandedOptionIndex(null);
     setBrief(null);
@@ -513,6 +548,7 @@ export default function App() {
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     return run("options", () => postJson<LessonOptionsResponse>("/api/options", requestPayload), (result) => {
       setLessonOptions(result.options);
+      setOptionReview(result.optionReview ?? null);
     });
   };
 
@@ -986,6 +1022,7 @@ export default function App() {
               }
             >
               <p className="muted">Compare fit, tradeoffs, visual needs, and rehearsal focus before choosing.</p>
+              {optionReview && <OptionAgentReviewPanel review={optionReview} />}
               <div className="option-picker">
                 {lessonOptions.map((option, index) => {
                   const isSelected = selectedOptionIndex === index;

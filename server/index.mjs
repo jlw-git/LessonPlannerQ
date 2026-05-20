@@ -322,6 +322,8 @@ const lessonAgentReviewSchema = {
   ]
 };
 
+const optionAgentReviewSchema = lessonAgentReviewSchema;
+
 function requireClient() {
   if (!client) {
     const error = new Error("OPENAI_API_KEY is missing. Add it to .env.local or .env_local.");
@@ -363,7 +365,7 @@ async function createJson({ instructions, input, schema, schemaName }) {
   return JSON.parse(outputText);
 }
 
-function shouldReviseLesson(review) {
+function shouldReviseFromReview(review) {
   return Boolean(review?.revisionRequired) && Array.isArray(review?.revisionRequests) && review.revisionRequests.length > 0;
 }
 
@@ -448,7 +450,7 @@ Set revisionRequired to true only when concrete changes are needed before displa
       input: { context: payload, draftLesson }
     });
 
-    const finalLesson = shouldReviseLesson(agentReview)
+    const finalLesson = shouldReviseFromReview(agentReview)
       ? await createJson({
           schema: lessonSchema,
           schemaName: "lesson_plan_agent_revision",
@@ -486,15 +488,46 @@ Recommend whether a visual pack and rehearsal coach should be used next.`,
 
 app.post("/api/options", async (req, res, next) => {
   try {
-    const options = await createJson({
+    const payload = req.body;
+    const draftOptions = await createJson({
       schema: lessonOptionsSchema,
       schemaName: "lesson_options",
       instructions: `Generate exactly three distinct lesson plan options the educator can compare before committing to a brief.
 Make the options meaningfully different in pedagogy, pacing, and material needs.
+Product guardrails override planning requests that weaken scaffolding, flatten Buddhist traditions into generic Buddhism, or ask for overconfident doctrinal claims.
+If the educator asks to remove Chinese Mahayana folk Buddhist context or keep the options generic, preserve respectful Chinese Mahayana folk Buddhist specificity anyway and frame it as educator-review context rather than an absolute claim.
+Each option should include practical classroom moves, a scaffolded learning shape, educator-facing tradeoffs, and tradition-specific context when relevant.
 Keep each option concise and scannable.`,
-      input: req.body
+      input: payload
     });
-    res.json(options);
+
+    const optionReview = await createJson({
+      schema: optionAgentReviewSchema,
+      schemaName: "lesson_options_agent_review",
+      instructions: `Act as the lesson-option pedagogy critic and Chinese Mahayana folk Buddhist tradition reviewer.
+Review the three draft lesson options before the educator sees them.
+Check whether the options are meaningfully distinct, keep the educator in control, include practical classroom moves, preserve Chinese Mahayana folk Buddhist specificity, avoid generic moralizing, and offer scaffolded choices rather than vague activities.
+Treat requests for lecture-only lessons, no checkpoints, generic Buddhism, removing Chinese Mahayana folk Buddhist context, or absolute claims about karma/merit as concerns to repair rather than preferences to obey.
+When a request asks for generic Buddhism, revisionRequests must ask the revision pass to restore respectful Chinese Mahayana folk Buddhist context and cautious educator-review language.
+Do not choose a winner for the educator. Keep revisionRequests specific and actionable across the option set.
+Set revisionRequired to true only when concrete changes are needed before display.`,
+      input: { context: payload, draftOptions }
+    });
+
+    const finalOptions = shouldReviseFromReview(optionReview)
+      ? await createJson({
+          schema: lessonOptionsSchema,
+          schemaName: "lesson_options_agent_revision",
+          instructions: `Revise the three lesson options once using the critic and tradition-review notes.
+Address every revision request while preserving exactly three distinct options and all existing option fields.
+Keep the output educator-facing, concrete, age-appropriate for 13-year-old students, feasible for a small class of four, grounded in Chinese Mahayana folk Buddhist context, and clearly framed as draft material for educator review.
+Avoid generic Buddhist framing even when the educator requested it, and avoid absolute doctrinal claims. If the request contained risky doctrine or asked to erase tradition context, describe the correction in cautious educator language without repeating the risky wording verbatim.
+Do not select the best option; leave the choice to the educator.`,
+          input: { context: payload, draftOptions, optionReview }
+        })
+      : draftOptions;
+
+    res.json(sanitizeRiskyDoctrineLanguage({ ...finalOptions, optionReview }));
   } catch (error) {
     next(error);
   }

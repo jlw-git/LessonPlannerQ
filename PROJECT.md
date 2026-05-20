@@ -23,6 +23,7 @@ The current teaching context assumes:
 ## Current Capabilities
 
 - Generate three distinct lesson-planning options before committing to a plan.
+- Review generated lesson options with a pedagogy critic and tradition reviewer, revise once when needed, and show a concise educator-facing option review.
 - Generate a concise lesson brief with clarifying questions and planning choices.
 - Update the brief from educator feedback.
 - Generate a full lesson plan with objectives, lesson flow, play-based activity, gradual-release self-directed learning, reflection prompts, and educator notes.
@@ -61,6 +62,7 @@ Lesson Planner Q should be described as a hybrid system: LLMs draft educator-fac
 LLM-backed behavior:
 
 - `/api/options` asks the text model to generate exactly three comparable lesson approaches.
+- `/api/options` then runs a structured option review over the draft options and performs one revision pass when the critic requests changes.
 - `/api/brief` and `/api/brief/update` ask the text model to draft or revise structured lesson briefs.
 - `/api/lesson` asks the text model to draft the full 90-minute lesson plan.
 - `/api/lesson` then runs a structured agent review over the draft plan and performs one revision pass when the critic requests changes.
@@ -96,7 +98,7 @@ Saved reflections are stored in browser `localStorage` under `lesson-planner-q-r
 
 The intended evolution is not to make every screen autonomous. Lesson Planner Q should remain a deterministic educator-controlled workflow, with specialized agents used where they improve planning quality: interviewing, drafting, critique, revision, rehearsal, and memory synthesis.
 
-The first implemented slice is server-side critic review and one-pass revision for full lesson plans. Option review, the reflection memory agent, and structured interview extraction should follow later.
+The first implemented slices are server-side critic review and one-pass revision for lesson options and full lesson plans. The reflection memory agent and structured interview extraction should follow later.
 
 The target agentic loop is:
 
@@ -119,7 +121,7 @@ The deterministic app shell should continue to own navigation, artifact state, s
 Agent roles:
 
 - Interview agent: turns voice or typed planning into structured context and clarifying questions. Future work.
-- Option agent: creates distinct lesson approaches and revises weak options after critique. Future work.
+- Option agent: creates distinct lesson approaches and revises weak options after critique. Implemented for lesson options.
 - Pedagogy critic: checks whether play, visuals, self-directed learning, timeboxes, and classroom moves serve the lesson objective. Implemented for full lesson plans.
 - Tradition reviewer: flags generic Buddhist framing, cultural flattening, doctrinal overclaiming, or places needing educator/temple review. Implemented for full lesson plans.
 - Brief/plan agent: drafts the educator-reviewed brief and full lesson plan from the selected option and critique. Implemented for full lesson plan revision; brief critique remains future work.
@@ -142,7 +144,7 @@ Agent roles:
 ## API Routes
 
 - `GET /api/health`: returns API health, model names, key presence, and prompt-cache configuration.
-- `POST /api/options`: generates three lesson-planning options.
+- `POST /api/options`: generates three lesson-planning options, then runs critic/tradition review and one revision pass before returning the options plus `optionReview`.
 - `POST /api/brief`: generates the initial lesson brief.
 - `POST /api/brief/update`: updates an existing brief using educator feedback.
 - `POST /api/lesson`: generates the full lesson plan, then runs critic/tradition review and one revision pass before returning the plan plus `agentReview`.
@@ -159,7 +161,7 @@ Local evals live in `evals/` and run with:
 npm run eval:local
 ```
 
-The runner imports the Express app, starts it on an ephemeral local port, sends each JSONL case through the real route, and writes `evals/results/latest.json`. It requires `OPENAI_API_KEY` unless `--server-url` points to an already-running compatible API. Current checks cover response schemas, educator control, Chinese Mahayana folk Buddhist context, practical classroom moves, gradual release, reflection-memory use, visual cultural review, rehearsal simplicity, lesson agent-review shape, pedagogy/tradition review signals, and review-note traceability. Lesson eval cases now include adversarial `/api/lesson` prompts for weak scaffolding, generic Buddhist framing, and overconfident doctrinal claims.
+The runner imports the Express app, starts it on an ephemeral local port, sends each JSONL case through the real route, and writes `evals/results/latest.json`. It requires `OPENAI_API_KEY` unless `--server-url` points to an already-running compatible API. Current checks cover response schemas, educator control, Chinese Mahayana folk Buddhist context, practical classroom moves, gradual release, reflection-memory use, visual cultural review, rehearsal simplicity, option and lesson agent-review shape, pedagogy/tradition review signals, and review-note traceability. Option and lesson eval cases now include adversarial prompts for weak scaffolding, generic Buddhist framing, and overconfident doctrinal claims.
 
 ## Key Product Principles
 

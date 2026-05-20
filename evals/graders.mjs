@@ -29,6 +29,10 @@ function agentReviewOf(output) {
   return output?.agentReview && typeof output.agentReview === "object" ? output.agentReview : null;
 }
 
+function optionReviewOf(output) {
+  return output?.optionReview && typeof output.optionReview === "object" ? output.optionReview : null;
+}
+
 function pass(name, details) {
   return { name, passed: true, details };
 }
@@ -45,6 +49,42 @@ const schemaChecks = {
     const incomplete = output.options.find((option) => !hasAllKeys(option, required));
     if (incomplete) return fail("options_schema", "At least one option is missing a required field.");
     return pass("options_schema", "Found exactly 3 complete lesson options.");
+  },
+
+  options_agent_review_schema(output) {
+    const review = optionReviewOf(output);
+    const required = [
+      "summary",
+      "strengths",
+      "revisionRequired",
+      "revisionRequests",
+      "pedagogyNotes",
+      "traditionReviewNotes",
+      "educatorReviewNotes"
+    ];
+    if (!hasAllKeys(review, required)) {
+      return fail("options_agent_review_schema", "Expected structured optionReview on the options response.");
+    }
+    if (typeof review.revisionRequired !== "boolean") {
+      return fail("options_agent_review_schema", "Expected optionReview.revisionRequired to be a boolean.");
+    }
+    if (
+      !Array.isArray(review.strengths) ||
+      !Array.isArray(review.revisionRequests) ||
+      !Array.isArray(review.pedagogyNotes) ||
+      !Array.isArray(review.traditionReviewNotes) ||
+      !Array.isArray(review.educatorReviewNotes)
+    ) {
+      return fail("options_agent_review_schema", "Expected all optionReview note groups to be arrays.");
+    }
+    if (review.revisionRequired && !listHasText(review.revisionRequests)) {
+      return fail("options_agent_review_schema", "Expected revisionRequests when revisionRequired is true.");
+    }
+    const reviewText = textOf(review);
+    if (!hasAny(reviewText, ["educator", "review", "option", "scaffold", "tradition", "chinese mahayana", "classroom"])) {
+      return fail("options_agent_review_schema", "Expected option critic review to name educator review, pedagogy, or tradition concerns.");
+    }
+    return pass("options_agent_review_schema", "Options response includes structured critic review notes.");
   },
 
   lesson_schema(output) {
@@ -212,6 +252,111 @@ const productChecks = {
       return pass("sensitive_review", "Output handles sensitive doctrinal framing cautiously.");
     }
     return fail("sensitive_review", "Expected cautious handling of sensitive doctrinal framing.");
+  },
+
+  options_pedagogy_signal(output) {
+    const review = optionReviewOf(output);
+    const options = Array.isArray(output.options) ? output.options : [];
+    const completeOptions = options.every(
+      (option) =>
+        Array.isArray(option.lessonShape) &&
+        option.lessonShape.length > 0 &&
+        Array.isArray(option.activities) &&
+        option.activities.length > 0 &&
+        Array.isArray(option.tradeoffs) &&
+        option.tradeoffs.length > 0
+    );
+    const optionTexts = options.map((option) => textOf(option));
+    const optionsWithClassroomMoves = optionTexts.filter((text) =>
+      hasAny(text, ["role-play", "cards", "paired", "round-robin", "timebox", "checkpoint", "movement", "sort", "debrief", "practice"])
+    ).length;
+    const pedagogyText = textOf([output.options, review?.pedagogyNotes, review?.educatorReviewNotes]);
+    const hasPedagogyLanguage = hasAny(pedagogyText, [
+      "scaffold",
+      "guided",
+      "model",
+      "practice",
+      "checkpoint",
+      "timebox",
+      "debrief",
+      "self-directed",
+      "small class"
+    ]);
+    if (completeOptions && optionsWithClassroomMoves >= 2 && hasPedagogyLanguage) {
+      return pass("options_pedagogy_signal", "Options and review show concrete scaffolding and classroom practice signals.");
+    }
+    return fail("options_pedagogy_signal", "Expected option set to show scaffolded, practical classroom choices.");
+  },
+
+  options_tradition_signal(output) {
+    const review = optionReviewOf(output);
+    const traditionText = textOf([
+      output.options,
+      review?.traditionReviewNotes,
+      review?.educatorReviewNotes
+    ]);
+    const hasSpecificContext = hasAny(traditionText, [
+      "chinese mahayana",
+      "folk buddh",
+      "guanyin",
+      "ksitigarbha",
+      "bodhisattva",
+      "merit",
+      "temple",
+      "family practice"
+    ]);
+    const hasCaution = hasAny(traditionText, [
+      "educator review",
+      "review",
+      "temple",
+      "careful",
+      "avoid",
+      "not all buddhist",
+      "doctrinal",
+      "tradition",
+      "context"
+    ]);
+    const overconfident = hasAny(traditionText, [
+      "all buddhists believe",
+      "buddhism teaches that everyone must",
+      "this proves",
+      "guarantees enlightenment",
+      "always creates merit",
+      "karma means bad things happen because"
+    ]);
+    if (hasSpecificContext && hasCaution && !overconfident) {
+      return pass("options_tradition_signal", "Options and review preserve specific tradition context with cautious framing.");
+    }
+    if (overconfident) {
+      return fail("options_tradition_signal", "Found overconfident or flattening doctrinal language.");
+    }
+    return fail("options_tradition_signal", "Expected specific Chinese Mahayana folk Buddhist context plus cautious review language.");
+  },
+
+  options_revision_trace(output) {
+    const review = optionReviewOf(output);
+    if (!review) return fail("options_revision_trace", "Expected optionReview to trace the review pass.");
+    if (!Array.isArray(output.options) || output.options.length !== 3) {
+      return fail("options_revision_trace", "Expected final options to remain visible alongside optionReview.");
+    }
+    const optionsText = textOf(output.options);
+    const noteGroups = [
+      ...(review.pedagogyNotes || []),
+      ...(review.traditionReviewNotes || []),
+      ...(review.educatorReviewNotes || []),
+      ...(review.revisionRequests || [])
+    ].filter((note) => typeof note === "string" && note.trim().length > 0);
+    const carriedNote = noteGroups.some((note) => {
+      const words = note
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((word) => word.length >= 6);
+      return words.some((word) => optionsText.includes(word));
+    });
+    if (carriedNote || (!review.revisionRequired && noteGroups.length > 0)) {
+      return pass("options_revision_trace", "Option review is returned with final options and traceable concerns.");
+    }
+    return fail("options_revision_trace", "Expected optionReview concerns to remain traceable to the final option set.");
   },
 
   lesson_pedagogy_signal(output) {

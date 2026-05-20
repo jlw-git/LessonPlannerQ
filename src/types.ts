@@ -41,6 +41,8 @@ export type LessonAgentReview = {
   educatorReviewNotes: string[];
 };
 
+export type OptionAgentReview = LessonAgentReview;
+
 export type LessonBrief = {
   title: string;
   briefSummary: string;
@@ -69,6 +71,7 @@ export type LessonOption = {
 
 export type LessonOptionsResponse = {
   options: LessonOption[];
+  optionReview?: OptionAgentReview;
 };
 
 export type VisualPack = {
