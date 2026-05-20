@@ -9,7 +9,7 @@ const root = process.cwd();
 for (const file of [".env.local", ".env_local", ".env"]) {
   const candidate = path.join(root, file);
   if (fs.existsSync(candidate)) {
-    dotenv.config({ path: candidate, override: false });
+    dotenv.config({ path: candidate, override: false, quiet: true });
   }
 }
 
