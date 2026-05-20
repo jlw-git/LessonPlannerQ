@@ -1,6 +1,6 @@
 # Product Requirements Document: Lesson Planner Q
 
-Last updated: May 13, 2026
+Last updated: May 20, 2026
 
 ## 1. Overview
 
@@ -376,6 +376,37 @@ This is deferred from the core MVP unless implemented as a limited educator-only
 - Prompt caching should be used where appropriate for stable system instructions and schemas.
 
 ## 12. AI Capability Mapping
+
+Lesson Planner Q should make clear to educators and builders which parts are model-generated and which parts are application logic. The product is not a fully autonomous lesson designer; it is a structured planning workflow that asks LLMs to draft specific artifacts inside app-defined boundaries.
+
+### LLM-Generated Capabilities
+
+LLMs should generate draft content where open-ended judgment, language, examples, and classroom adaptation are needed:
+
+- lesson option drafts
+- lesson brief drafts and brief revisions
+- full lesson plan drafts
+- visual material pack drafts and image prompts
+- rehearsal scenarios, likely student questions, simpler wording, and coaching notes
+- educator-facing voice planning and rehearsal conversation
+- generated lesson images, when the educator requests image rendering
+
+All LLM-generated content must remain educator-reviewed draft material. The product should avoid implying that generated content is doctrinally authoritative, classroom-ready without review, or a substitute for the educator's judgment.
+
+### Rules-Based And App-Controlled Capabilities
+
+Rules-based logic should define the product structure around the LLM outputs:
+
+- planning workflow order and navigation
+- typed form fields, defaults, and request payload assembly
+- selected lesson option state and whether a brief, plan, visual pack, or rehearsal can be requested
+- local reflection creation, editing, deletion, display, and browser storage
+- limits on how many recent reflections are sent as planning memory
+- API route boundaries, health checks, environment-driven model selection, error handling, and prompt-cache configuration
+- JSON schema contracts for generated text artifacts
+- deterministic local eval graders for schema shape and product guardrails
+
+Rules and schemas constrain the model's output shape and product flow, but they do not verify religious accuracy, cultural appropriateness, or classroom fit by themselves. Those still require educator review.
 
 ### GPT Realtime 2
 
