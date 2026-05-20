@@ -81,7 +81,7 @@ Rules-based and deterministic behavior:
 - The Express server owns route boundaries, model selection from environment variables, strict JSON schema contracts, prompt-cache keys, health responses, and API error handling.
 - JSON schemas constrain the shape of model responses, but the prose content inside those schemas is still model-generated and requires educator review.
 - The eval runner and graders are deterministic checks over route responses; they do not replace human review of religious, cultural, or classroom fit.
-- `/api/lesson` also applies a narrow deterministic sanitizer for known overconfident doctrinal phrases so rejected adversarial wording is not echoed back in educator-facing output.
+- `/api/options` and `/api/lesson` also apply a narrow deterministic sanitizer for known overconfident doctrinal phrases so rejected adversarial wording is not echoed back in educator-facing output.
 
 ## How It Works
 
@@ -124,8 +124,8 @@ Agent roles:
 
 - Interview agent: turns voice or typed planning into structured context and clarifying questions. Future work.
 - Option agent: creates distinct lesson approaches and revises weak options after critique. Implemented for lesson options.
-- Pedagogy critic: checks whether play, visuals, self-directed learning, timeboxes, and classroom moves serve the lesson objective. Implemented for full lesson plans.
-- Tradition reviewer: flags generic Buddhist framing, cultural flattening, doctrinal overclaiming, or places needing educator/temple review. Implemented for full lesson plans.
+- Pedagogy critic: checks whether play, visuals, self-directed learning, timeboxes, and classroom moves serve the lesson objective. Implemented for lesson options and full lesson plans.
+- Tradition reviewer: flags generic Buddhist framing, cultural flattening, doctrinal overclaiming, or places needing educator/temple review. Implemented for lesson options and full lesson plans.
 - Brief/plan agent: drafts the educator-reviewed brief and full lesson plan from the selected option and critique. Implemented for full lesson plan revision; brief critique remains future work.
 - Rehearsal agent: helps the educator practice likely student questions, simpler language, and difficult explanations. Current rehearsal route drafts coaching; live attempt critique remains future work.
 - Reflection memory agent: summarizes saved after-class reflections into inspectable classroom evidence for future planning. Future work.

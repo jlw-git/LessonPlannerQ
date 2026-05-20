@@ -438,7 +438,7 @@ The target loop is:
 12. After class, reflection agent summarizes classroom evidence into memory.
 13. Next planning session starts with that memory.
 
-The implemented first build slices cover option review/revision and full-plan review/revision. Structured interview extraction, brief critique, rehearsal attempt critique, and reflection memory synthesis should remain roadmap work until those review loops are validated.
+The implemented first build slices cover option review/revision and full-plan review/revision, with local eval coverage for schema shape, pedagogy signals, tradition-review signals, and adversarial guardrails. Structured interview extraction, brief critique, rehearsal attempt critique, and reflection memory synthesis remain roadmap work after this validated review-loop foundation.
 
 ### GPT Realtime 2
 

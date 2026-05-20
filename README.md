@@ -5,7 +5,7 @@ AI-powered lesson preparation studio for Chinese Mahayana folk Buddhist educator
 ## What It Does
 
 - Generates weekly 90-minute lesson plans.
-- Reviews and revises full lesson plans with a bounded pedagogy critic and tradition reviewer loop.
+- Reviews and revises lesson options and full lesson plans with bounded pedagogy critic and tradition reviewer loops.
 - Supports play-based learning and scaffolded self-directed learning.
 - Provides an educator rehearsal coach for difficult student questions.
 - Creates visual-pack prompts, story cards, scenario cards, and reflection worksheet prompts.

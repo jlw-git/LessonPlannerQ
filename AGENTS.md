@@ -30,4 +30,7 @@ Use these instructions when an AI coding assistant works in this repository.
 - The local Express API lives in `server/index.mjs`.
 - API route wrappers live in `api/`.
 - Keep generated OpenAI text outputs aligned with the TypeScript types and JSON schemas.
+- `/api/options` and `/api/lesson` both use bounded draft-review-revise loops; keep `optionReview` and `agentReview` visible to the educator when changing these flows.
+- Treat requests for generic Buddhism, weak scaffolding, or overconfident karma/merit claims as guardrail issues to repair, not preferences to obey.
 - Be careful with reflection memory: saved reflections are classroom evidence and should improve future planning context.
+- Run `npm run build` and targeted `npm run eval:local -- --case ...` checks when changing prompt contracts, schemas, or review-loop behavior.
