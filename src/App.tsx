@@ -21,7 +21,15 @@ import {
   X,
   Wand2
 } from "lucide-react";
-import type { LessonBrief, LessonOption, LessonOptionsResponse, LessonPlan, Rehearsal, VisualPack } from "./types";
+import type {
+  LessonAgentReview,
+  LessonBrief,
+  LessonOption,
+  LessonOptionsResponse,
+  LessonPlan,
+  Rehearsal,
+  VisualPack
+} from "./types";
 
 type FormState = {
   topic: string;
@@ -137,6 +145,49 @@ function List({ items }: { items: string[] }) {
         <li key={`${item}-${index}`}>{item}</li>
       ))}
     </ul>
+  );
+}
+
+function LessonAgentReviewPanel({ review }: { review: LessonAgentReview }) {
+  const revisionItems =
+    review.revisionRequired && review.revisionRequests.length > 0
+      ? review.revisionRequests
+      : ["No required revision after critic review."];
+
+  return (
+    <aside className="agent-review-panel" aria-label="Plan critic review">
+      <div className="agent-review-heading">
+        <AlertCircle size={20} />
+        <div>
+          <span>Plan critic review</span>
+          <p>{review.summary}</p>
+        </div>
+      </div>
+      <div className="agent-review-grid">
+        <div>
+          <strong>Strengths</strong>
+          <List items={review.strengths} />
+        </div>
+        <div>
+          <strong>Revisions checked</strong>
+          <List items={revisionItems} />
+        </div>
+        <div>
+          <strong>Pedagogy notes</strong>
+          <List items={review.pedagogyNotes} />
+        </div>
+        <div>
+          <strong>Tradition review</strong>
+          <List items={review.traditionReviewNotes} />
+        </div>
+      </div>
+      {review.educatorReviewNotes.length > 0 && (
+        <div className="agent-review-footer">
+          <strong>For educator review</strong>
+          <List items={review.educatorReviewNotes} />
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -1268,6 +1319,8 @@ export default function App() {
                   <p>{lesson.takeHome}</p>
                 </article>
               </div>
+
+              {lesson.agentReview && <LessonAgentReviewPanel review={lesson.agentReview} />}
 
               <div className="two-col">
                 <div>

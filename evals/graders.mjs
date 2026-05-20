@@ -21,6 +21,14 @@ function hasAllKeys(value, keys) {
   return value && typeof value === "object" && keys.every((key) => Object.hasOwn(value, key));
 }
 
+function listHasText(value) {
+  return Array.isArray(value) && value.some((item) => typeof item === "string" && item.trim().length > 0);
+}
+
+function agentReviewOf(output) {
+  return output?.agentReview && typeof output.agentReview === "object" ? output.agentReview : null;
+}
+
 function pass(name, details) {
   return { name, passed: true, details };
 }
@@ -60,6 +68,46 @@ const schemaChecks = {
       return fail("lesson_schema", "Expected at least 4 lesson-flow segments.");
     }
     return pass("lesson_schema", "Lesson plan includes the expected top-level contract.");
+  },
+
+  lesson_agent_review_schema(output) {
+    const review = agentReviewOf(output);
+    const required = [
+      "summary",
+      "strengths",
+      "revisionRequired",
+      "revisionRequests",
+      "pedagogyNotes",
+      "traditionReviewNotes",
+      "educatorReviewNotes"
+    ];
+    if (!hasAllKeys(review, required)) {
+      return fail("lesson_agent_review_schema", "Expected structured agentReview on the lesson plan.");
+    }
+    if (typeof review.revisionRequired !== "boolean") {
+      return fail("lesson_agent_review_schema", "Expected agentReview.revisionRequired to be a boolean.");
+    }
+    if (
+      !Array.isArray(review.strengths) ||
+      !Array.isArray(review.revisionRequests) ||
+      !Array.isArray(review.pedagogyNotes) ||
+      !Array.isArray(review.traditionReviewNotes) ||
+      !Array.isArray(review.educatorReviewNotes)
+    ) {
+      return fail("lesson_agent_review_schema", "Expected all agentReview note groups to be arrays.");
+    }
+    if (review.revisionRequired && !listHasText(review.revisionRequests)) {
+      return fail("lesson_agent_review_schema", "Expected revisionRequests when revisionRequired is true.");
+    }
+    const reviewText = textOf(review);
+    if (!hasAny(reviewText, ["educator", "review", "scaffold", "tradition", "chinese mahayana", "classroom"])) {
+      return fail("lesson_agent_review_schema", "Expected critic review to name educator review, pedagogy, or tradition concerns.");
+    }
+    return pass("lesson_agent_review_schema", "Lesson plan includes structured critic review notes.");
+  },
+
+  lesson_agent_review(output) {
+    return schemaChecks.lesson_agent_review_schema(output);
   },
 
   visual_schema(output) {
@@ -164,6 +212,117 @@ const productChecks = {
       return pass("sensitive_review", "Output handles sensitive doctrinal framing cautiously.");
     }
     return fail("sensitive_review", "Expected cautious handling of sensitive doctrinal framing.");
+  },
+
+  lesson_pedagogy_signal(output) {
+    const review = agentReviewOf(output);
+    const sdl = output.selfDirectedLearning;
+    const hasGradualRelease =
+      sdl?.iDo?.trim() &&
+      sdl?.weDo?.trim() &&
+      sdl?.youDo?.trim() &&
+      Array.isArray(sdl?.checkpoints) &&
+      sdl.checkpoints.length >= 2;
+    const lessonFlowHasAction =
+      Array.isArray(output.lessonFlow) &&
+      output.lessonFlow.length >= 4 &&
+      output.lessonFlow.some((segment) => segment?.studentAction?.trim() && segment?.duration?.trim());
+    const pedagogyText = textOf([
+      output.selfDirectedLearning,
+      output.lessonFlow,
+      output.playBasedActivity,
+      review?.pedagogyNotes,
+      review?.educatorReviewNotes
+    ]);
+    const hasPedagogyLanguage = hasAny(pedagogyText, [
+      "scaffold",
+      "i do",
+      "we do",
+      "you do",
+      "checkpoint",
+      "timebox",
+      "model",
+      "practice",
+      "debrief",
+      "self-directed"
+    ]);
+    if (hasGradualRelease && lessonFlowHasAction && hasPedagogyLanguage) {
+      return pass("lesson_pedagogy_signal", "Lesson and review show concrete scaffolding and classroom practice signals.");
+    }
+    return fail("lesson_pedagogy_signal", "Expected visible scaffolding, checkpoints, and practical pedagogy signals.");
+  },
+
+  lesson_tradition_signal(output) {
+    const review = agentReviewOf(output);
+    const traditionText = textOf([
+      output.traditionNote,
+      output.teachingAnchor,
+      output.educatorNotes,
+      output.reviewNotes,
+      review?.traditionReviewNotes,
+      review?.educatorReviewNotes
+    ]);
+    const hasSpecificContext = hasAny(traditionText, [
+      "chinese mahayana",
+      "folk buddh",
+      "guanyin",
+      "ksitigarbha",
+      "bodhisattva",
+      "merit",
+      "temple",
+      "family practice"
+    ]);
+    const hasCaution = hasAny(traditionText, [
+      "educator review",
+      "review",
+      "temple",
+      "careful",
+      "avoid",
+      "not all buddhist",
+      "doctrinal",
+      "tradition"
+    ]);
+    const overconfident = hasAny(traditionText, [
+      "all buddhists believe",
+      "buddhism teaches that everyone must",
+      "this proves",
+      "guarantees enlightenment",
+      "always creates merit",
+      "karma means bad things happen because"
+    ]);
+    if (hasSpecificContext && hasCaution && !overconfident) {
+      return pass("lesson_tradition_signal", "Lesson and review preserve specific tradition context with cautious framing.");
+    }
+    if (overconfident) {
+      return fail("lesson_tradition_signal", "Found overconfident or flattening doctrinal language.");
+    }
+    return fail("lesson_tradition_signal", "Expected specific Chinese Mahayana folk Buddhist context plus cautious review language.");
+  },
+
+  lesson_revision_trace(output) {
+    const review = agentReviewOf(output);
+    if (!review) return fail("lesson_revision_trace", "Expected agentReview to trace the review pass.");
+    if (!Array.isArray(output.reviewNotes) || output.reviewNotes.length === 0) {
+      return fail("lesson_revision_trace", "Expected educator-visible reviewNotes from the review pass.");
+    }
+    const reviewNotesText = textOf(output.reviewNotes);
+    const noteGroups = [
+      ...(review.pedagogyNotes || []),
+      ...(review.traditionReviewNotes || []),
+      ...(review.educatorReviewNotes || []),
+      ...(review.revisionRequests || [])
+    ].filter((note) => typeof note === "string" && note.trim().length > 0);
+    const carriedNote = noteGroups.some((note) => {
+      const words = note
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((word) => word.length >= 6);
+      return words.some((word) => reviewNotesText.includes(word));
+    });
+    if (carriedNote || (!review.revisionRequired && noteGroups.length > 0 && hasAny(reviewNotesText, ["review", "educator", "tradition", "scaffold"]))) {
+      return pass("lesson_revision_trace", "Critic or reviewer notes are visible in final educator review notes.");
+    }
+    return fail("lesson_revision_trace", "Expected final reviewNotes to carry through the agent review concerns.");
   }
 };
 

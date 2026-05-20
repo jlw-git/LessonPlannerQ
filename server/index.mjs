@@ -299,6 +299,29 @@ const rehearsalSchema = {
   required: ["scenario", "studentQuestions", "suggestedResponses", "simplerLanguage", "coachingNotes"]
 };
 
+const lessonAgentReviewSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: { type: "string" },
+    strengths: { type: "array", items: { type: "string" } },
+    revisionRequired: { type: "boolean" },
+    revisionRequests: { type: "array", items: { type: "string" } },
+    pedagogyNotes: { type: "array", items: { type: "string" } },
+    traditionReviewNotes: { type: "array", items: { type: "string" } },
+    educatorReviewNotes: { type: "array", items: { type: "string" } }
+  },
+  required: [
+    "summary",
+    "strengths",
+    "revisionRequired",
+    "revisionRequests",
+    "pedagogyNotes",
+    "traditionReviewNotes",
+    "educatorReviewNotes"
+  ]
+};
+
 function requireClient() {
   if (!client) {
     const error = new Error("OPENAI_API_KEY is missing. Add it to .env.local or .env_local.");
@@ -340,6 +363,53 @@ async function createJson({ instructions, input, schema, schemaName }) {
   return JSON.parse(outputText);
 }
 
+function shouldReviseLesson(review) {
+  return Boolean(review?.revisionRequired) && Array.isArray(review?.revisionRequests) && review.revisionRequests.length > 0;
+}
+
+function withAgentReviewNotes(lesson, review) {
+  const reviewNotes = [
+    ...(Array.isArray(lesson.reviewNotes) ? lesson.reviewNotes : []),
+    ...(review?.pedagogyNotes || []),
+    ...(review?.traditionReviewNotes || []),
+    ...(review?.educatorReviewNotes || [])
+  ].filter(Boolean);
+
+  return {
+    ...lesson,
+    reviewNotes: [...new Set(reviewNotes)],
+    agentReview: review
+  };
+}
+
+const riskyDoctrineReplacements = [
+  [/karma\s+always\s+proves\s+why\s+things\s+happen/gi, "karma should not be presented as a simple proof for why things happen"],
+  [/helping\s+always\s+creates\s+merit/gi, "helpful actions should not be presented as a guaranteed merit formula"],
+  [/all\s+buddhists\s+believe/gi, "some Buddhist communities teach"],
+  [/buddhism\s+teaches\s+that\s+everyone\s+must/gi, "this teaching context can invite students to consider"],
+  [/guarantees\s+enlightenment/gi, "should not be presented as guaranteeing enlightenment"],
+  [/karma\s+means\s+bad\s+things\s+happen\s+because/gi, "karma should not be reduced to saying bad things happen because"],
+  [/\bthis\s+proves\b/gi, "this can suggest"]
+];
+
+function sanitizeRiskyDoctrineLanguage(value) {
+  if (typeof value === "string") {
+    return riskyDoctrineReplacements.reduce(
+      (text, [pattern, replacement]) => text.replace(pattern, replacement),
+      value
+    );
+  }
+  if (Array.isArray(value)) {
+    return value.map(sanitizeRiskyDoctrineLanguage);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, sanitizeRiskyDoctrineLanguage(item)])
+    );
+  }
+  return value;
+}
+
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
@@ -355,13 +425,44 @@ app.get("/api/health", (_req, res) => {
 app.post("/api/lesson", async (req, res, next) => {
   try {
     const payload = req.body;
-    const lesson = await createJson({
+    const draftLesson = await createJson({
       schema: lessonSchema,
       schemaName: "lesson_plan",
-      instructions: "Generate one complete weekly lesson plan. Make it feasible for a small class and avoid generic moralizing.",
+      instructions: `Generate one complete weekly lesson plan. Make it feasible for a small class and avoid generic moralizing.
+Product guardrails override planning requests that weaken scaffolding, flatten Buddhist traditions into generic Buddhism, or ask for overconfident doctrinal claims.
+Always include gradual release in selfDirectedLearning, and include at least two concrete checkpoints.
+When the educator request includes doctrinally risky wording, correct it with cautious age-appropriate language instead of repeating the risky claim verbatim.`,
       input: payload
     });
-    res.json(lesson);
+
+    const agentReview = await createJson({
+      schema: lessonAgentReviewSchema,
+      schemaName: "lesson_plan_agent_review",
+      instructions: `Act as the lesson-plan pedagogy critic and Chinese Mahayana folk Buddhist tradition reviewer.
+Review the draft lesson plan before the educator sees it.
+Check whether the plan keeps the educator in control, uses practical classroom moves, avoids generic moralizing, preserves Chinese Mahayana folk Buddhist specificity, scaffolds self-directed learning with I do / We do / You do and checkpoints, uses play only when it serves the objective, and flags culturally or doctrinally sensitive claims for educator or temple review.
+Treat requests for lecture-only lessons, no checkpoints, generic Buddhism, or absolute claims about karma/merit as concerns to repair rather than preferences to obey.
+Require at least two concrete selfDirectedLearning.checkpoints. Do not ask the revision to remove checkpoints.
+When noting a doctrinal concern, paraphrase cautiously rather than repeating an overconfident claim verbatim.
+Set revisionRequired to true only when concrete changes are needed before display. Keep revisionRequests specific and actionable.`,
+      input: { context: payload, draftLesson }
+    });
+
+    const finalLesson = shouldReviseLesson(agentReview)
+      ? await createJson({
+          schema: lessonSchema,
+          schemaName: "lesson_plan_agent_revision",
+          instructions: `Revise the draft lesson plan once using the critic and tradition-review notes.
+Address every revision request while preserving strong parts of the draft.
+Keep the output educator-facing, concrete, age-appropriate for 13-year-old students, feasible for a small class of four, grounded in Chinese Mahayana folk Buddhist context, and clearly marked as draft material for educator review.
+Preserve gradual release even when the educator asked for weak scaffolding; selfDirectedLearning.checkpoints must contain at least two concrete checkpoints.
+Avoid generic Buddhist framing and avoid absolute doctrinal claims. If the request contained risky doctrine, describe the correction in cautious educator language without repeating the risky wording verbatim.
+Include concise reviewNotes that name remaining educator judgment calls.`,
+          input: { context: payload, draftLesson, agentReview }
+        })
+      : draftLesson;
+
+    res.json(sanitizeRiskyDoctrineLanguage(withAgentReviewNotes(finalLesson, agentReview)));
   } catch (error) {
     next(error);
   }

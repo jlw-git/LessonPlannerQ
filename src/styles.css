@@ -3016,11 +3016,67 @@ label textarea {
 .option-detail-grid > div,
 .brief-hero > div,
 .lesson-overview article,
+.agent-review-panel,
+.agent-review-grid > div,
+.agent-review-footer,
 .option-compare-list div,
 .scaffold-list div {
   background: #fffefb;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.agent-review-panel {
+  background: #fffaf0;
+  border-color: rgba(180, 83, 9, 0.22);
+  display: grid;
+  gap: 14px;
+  padding: 15px;
+}
+
+.agent-review-heading {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.agent-review-heading svg {
+  color: #b45309;
+  margin-top: 2px;
+}
+
+.agent-review-heading span,
+.agent-review-grid strong,
+.agent-review-footer strong {
+  color: #7c2d12;
+  font-size: 0.72rem;
+  font-weight: 840;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.agent-review-heading p {
+  color: var(--ink);
+  line-height: 1.5;
+  margin: 4px 0 0;
+}
+
+.agent-review-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.agent-review-grid > div,
+.agent-review-footer {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(180, 83, 9, 0.16);
+  padding: 12px;
+}
+
+.agent-review-panel .stack-list {
+  margin-top: 8px;
 }
 
 .option-summary-card {
@@ -3341,6 +3397,7 @@ label textarea {
   .recommendation-grid,
   .lesson-overview,
   .brief-hero,
+  .agent-review-grid,
   .cards-grid,
   .image-prompt,
   .field-grid {

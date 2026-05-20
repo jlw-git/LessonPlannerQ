@@ -28,6 +28,17 @@ export type LessonPlan = {
   takeHome: string;
   educatorNotes: string[];
   reviewNotes: string[];
+  agentReview?: LessonAgentReview;
+};
+
+export type LessonAgentReview = {
+  summary: string;
+  strengths: string[];
+  revisionRequired: boolean;
+  revisionRequests: string[];
+  pedagogyNotes: string[];
+  traditionReviewNotes: string[];
+  educatorReviewNotes: string[];
 };
 
 export type LessonBrief = {

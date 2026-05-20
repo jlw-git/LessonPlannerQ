@@ -223,6 +223,7 @@ This is deferred from the core MVP unless implemented as a limited educator-only
 - Scaffolded self-directed learning generation using gradual release of responsibility: "I do, we do, you do."
 - Structured lesson brief generation and update flow.
 - Full 90-minute lesson plan generation.
+- Agentic critic review and one-pass revision for full lesson plans before educator display.
 - Educator facilitation notes.
 - Discussion prompts and reflection questions.
 - Real-life application exercises.
@@ -233,10 +234,12 @@ This is deferred from the core MVP unless implemented as a limited educator-only
 - Local persistence for saved lesson reflections in the prototype.
 - Small curated pedagogy library used as lesson-design guardrails.
 - Educator-visible rationale explaining why the generated lesson design fits the class context.
+- Educator-visible review notes from the pedagogy critic and tradition reviewer.
 - Professional, calm, Apple-inspired interface principles: clarity, hierarchy, spaciousness, direct manipulation, and minimum 44px touch targets.
 
 ### Deferred From MVP
 
+- Agentic critic review and one-pass revision for lesson options before educator display.
 - Live facilitation copilot, unless implemented as a limited educator-only beta.
 - Voice-based post-class reflection debrief.
 - Multi-week curriculum planning.
@@ -287,7 +290,10 @@ This is deferred from the core MVP unless implemented as a limited educator-only
 
 - The system must default lesson duration to 90 minutes.
 - The system must generate a complete weekly lesson plan.
+- The system should run a pedagogy critic and tradition reviewer over the draft plan before showing it.
+- The system should revise the plan once when the critic identifies concrete improvements.
 - The lesson plan must include learning objectives, timing, opening activity, main activity, discussion prompts, reflection questions, facilitation notes, materials, and optional take-home activity.
+- The lesson plan should include visible review notes about pedagogy, tradition handling, and educator judgment calls.
 - The system must support play-based and self-directed lesson formats.
 - The system must allow the educator to edit generated content.
 
@@ -379,6 +385,8 @@ This is deferred from the core MVP unless implemented as a limited educator-only
 
 Lesson Planner Q should make clear to educators and builders which parts are model-generated and which parts are application logic. The product is not a fully autonomous lesson designer; it is a structured planning workflow that asks LLMs to draft specific artifacts inside app-defined boundaries.
 
+The agentic direction is a bounded loop: draft, critique, revise once, show the educator the draft plus review notes, rehearse, and carry classroom evidence into the next plan. The deterministic product shell should continue to own navigation, state, validation, review gates, storage, and the educator-facing boundary.
+
 ### LLM-Generated Capabilities
 
 LLMs should generate draft content where open-ended judgment, language, examples, and classroom adaptation are needed:
@@ -386,6 +394,8 @@ LLMs should generate draft content where open-ended judgment, language, examples
 - lesson option drafts
 - lesson brief drafts and brief revisions
 - full lesson plan drafts
+- pedagogy critic and tradition reviewer notes for full lesson plans
+- one-pass full lesson plan revisions when the critic requests concrete changes
 - visual material pack drafts and image prompts
 - rehearsal scenarios, likely student questions, simpler wording, and coaching notes
 - educator-facing voice planning and rehearsal conversation
@@ -407,6 +417,26 @@ Rules-based logic should define the product structure around the LLM outputs:
 - deterministic local eval graders for schema shape and product guardrails
 
 Rules and schemas constrain the model's output shape and product flow, but they do not verify religious accuracy, cultural appropriateness, or classroom fit by themselves. Those still require educator review.
+
+### Agentic Planning Loop
+
+The target loop is:
+
+1. Educator talks or types.
+2. Interview agent extracts structured planning context.
+3. Option agent creates three approaches.
+4. Pedagogy critic and tradition reviewer inspect the options.
+5. Option agent revises weak options before showing them.
+6. Educator selects one.
+7. Brief/plan agent drafts.
+8. Critic reviews the full plan.
+9. Plan agent revises once.
+10. Educator sees the draft plus review notes.
+11. Rehearsal agent helps the educator practice.
+12. After class, reflection agent summarizes classroom evidence into memory.
+13. Next planning session starts with that memory.
+
+The implemented first build slice covers full-plan review/revision. Option review/revision, structured interview extraction, brief critique, rehearsal attempt critique, and reflection memory synthesis should remain roadmap work until that first slice is validated.
 
 ### GPT Realtime 2
 

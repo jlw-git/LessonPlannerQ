@@ -26,6 +26,7 @@ The current teaching context assumes:
 - Generate a concise lesson brief with clarifying questions and planning choices.
 - Update the brief from educator feedback.
 - Generate a full lesson plan with objectives, lesson flow, play-based activity, gradual-release self-directed learning, reflection prompts, and educator notes.
+- Review generated full lesson plans with a pedagogy critic and tradition reviewer, revise once when needed, and show educator-facing review notes.
 - Generate a visual material pack with image prompt, story cards, scenario cards, value cards, storyboard panels, worksheet prompts, and review notes.
 - Generate a lesson image from the visual pack prompt.
 - Generate rehearsal coaching for difficult student questions and simpler educator language.
@@ -62,6 +63,7 @@ LLM-backed behavior:
 - `/api/options` asks the text model to generate exactly three comparable lesson approaches.
 - `/api/brief` and `/api/brief/update` ask the text model to draft or revise structured lesson briefs.
 - `/api/lesson` asks the text model to draft the full 90-minute lesson plan.
+- `/api/lesson` then runs a structured agent review over the draft plan and performs one revision pass when the critic requests changes.
 - `/api/visuals` asks the text model to draft printable material guidance, story/scenario cards, worksheet prompts, storyboard panels, review notes, and the image prompt.
 - `/api/rehearsal` asks the text model to generate likely student questions, simpler language, suggested responses, and coaching notes.
 - `/api/image` uses the image model to render one lesson visual from the visual pack prompt.
@@ -75,6 +77,7 @@ Rules-based and deterministic behavior:
 - The Express server owns route boundaries, model selection from environment variables, strict JSON schema contracts, prompt-cache keys, health responses, and API error handling.
 - JSON schemas constrain the shape of model responses, but the prose content inside those schemas is still model-generated and requires educator review.
 - The eval runner and graders are deterministic checks over route responses; they do not replace human review of religious, cultural, or classroom fit.
+- `/api/lesson` also applies a narrow deterministic sanitizer for known overconfident doctrinal phrases so rejected adversarial wording is not echoed back in educator-facing output.
 
 ## How It Works
 
@@ -88,6 +91,40 @@ The main planning flow starts in `src/App.tsx`. The frontend is organized as a p
 6. The educator can compare options, refine a brief, generate a full plan, create visuals, rehearse explanations, and save reflections after the lesson.
 
 Saved reflections are stored in browser `localStorage` under `lesson-planner-q-reflections`. The app keeps up to 20 saved reflections and sends the five most recent into future planning requests as classroom evidence.
+
+## Agentic Planning Loop
+
+The intended evolution is not to make every screen autonomous. Lesson Planner Q should remain a deterministic educator-controlled workflow, with specialized agents used where they improve planning quality: interviewing, drafting, critique, revision, rehearsal, and memory synthesis.
+
+The first implemented slice is server-side critic review and one-pass revision for full lesson plans. Option review, the reflection memory agent, and structured interview extraction should follow later.
+
+The target agentic loop is:
+
+1. Educator talks or types.
+2. Interview agent extracts structured planning context.
+3. Option agent creates three approaches.
+4. Pedagogy critic and tradition reviewer inspect the options.
+5. Option agent revises weak options before showing them.
+6. Educator selects one.
+7. Brief/plan agent drafts.
+8. Critic reviews the full plan.
+9. Plan agent revises once.
+10. Educator sees the draft plus review notes.
+11. Rehearsal agent helps the educator practice.
+12. After class, reflection agent summarizes classroom evidence into memory.
+13. Next planning session starts with that memory.
+
+The deterministic app shell should continue to own navigation, artifact state, schema validation, storage limits, educator review gates, and the rule that the product is educator-facing rather than an unsupervised student agent. Agentic behavior should happen inside those boundaries, so the product feels like a thoughtful planning team while still presenting one coherent PlannerQ experience to the educator.
+
+Agent roles:
+
+- Interview agent: turns voice or typed planning into structured context and clarifying questions. Future work.
+- Option agent: creates distinct lesson approaches and revises weak options after critique. Future work.
+- Pedagogy critic: checks whether play, visuals, self-directed learning, timeboxes, and classroom moves serve the lesson objective. Implemented for full lesson plans.
+- Tradition reviewer: flags generic Buddhist framing, cultural flattening, doctrinal overclaiming, or places needing educator/temple review. Implemented for full lesson plans.
+- Brief/plan agent: drafts the educator-reviewed brief and full lesson plan from the selected option and critique. Implemented for full lesson plan revision; brief critique remains future work.
+- Rehearsal agent: helps the educator practice likely student questions, simpler language, and difficult explanations. Current rehearsal route drafts coaching; live attempt critique remains future work.
+- Reflection memory agent: summarizes saved after-class reflections into inspectable classroom evidence for future planning. Future work.
 
 ## Important Files and Folders
 
@@ -108,7 +145,7 @@ Saved reflections are stored in browser `localStorage` under `lesson-planner-q-r
 - `POST /api/options`: generates three lesson-planning options.
 - `POST /api/brief`: generates the initial lesson brief.
 - `POST /api/brief/update`: updates an existing brief using educator feedback.
-- `POST /api/lesson`: generates the full lesson plan.
+- `POST /api/lesson`: generates the full lesson plan, then runs critic/tradition review and one revision pass before returning the plan plus `agentReview`.
 - `POST /api/visuals`: generates the printable visual material pack.
 - `POST /api/rehearsal`: generates educator rehearsal coaching.
 - `POST /api/image`: generates one image from a visual prompt.
@@ -122,7 +159,7 @@ Local evals live in `evals/` and run with:
 npm run eval:local
 ```
 
-The runner imports the Express app, starts it on an ephemeral local port, sends each JSONL case through the real route, and writes `evals/results/latest.json`. It requires `OPENAI_API_KEY` unless `--server-url` points to an already-running compatible API. Current checks cover response schemas, educator control, Chinese Mahayana folk Buddhist context, practical classroom moves, gradual release, reflection-memory use, visual cultural review, and rehearsal simplicity.
+The runner imports the Express app, starts it on an ephemeral local port, sends each JSONL case through the real route, and writes `evals/results/latest.json`. It requires `OPENAI_API_KEY` unless `--server-url` points to an already-running compatible API. Current checks cover response schemas, educator control, Chinese Mahayana folk Buddhist context, practical classroom moves, gradual release, reflection-memory use, visual cultural review, rehearsal simplicity, lesson agent-review shape, pedagogy/tradition review signals, and review-note traceability. Lesson eval cases now include adversarial `/api/lesson` prompts for weak scaffolding, generic Buddhist framing, and overconfident doctrinal claims.
 
 ## Key Product Principles
 
