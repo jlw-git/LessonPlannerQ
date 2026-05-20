@@ -31,7 +31,7 @@ The current teaching context assumes:
 - Generate a visual material pack with image prompt, story cards, scenario cards, value cards, storyboard panels, worksheet prompts, and review notes.
 - Generate a lesson image from the visual pack prompt.
 - Generate rehearsal coaching for difficult student questions and simpler educator language.
-- Start a Realtime voice planning session through an ephemeral client secret.
+- Start a Realtime voice planning session through an ephemeral client secret, using audio-only browser microphone permission.
 - Save after-class lesson reflections in browser local storage and include recent reflections as planning memory for future outputs.
 - Run local evals against the real Express API routes to check schema contracts and product guardrails.
 
@@ -46,6 +46,8 @@ The app uses OpenAI for:
 - Structured text generation through the Responses API.
 - Image generation through the Images API.
 - Realtime voice sessions through Realtime client secrets and WebRTC.
+
+Realtime voice sessions request browser microphone access only. The app does not need system screen recording permission and should not request or document screen recording access.
 
 Default model environment variables are:
 

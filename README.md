@@ -50,6 +50,10 @@ npm run dev
 
 The web app runs at [http://127.0.0.1:5173](http://127.0.0.1:5173), and the API runs at `http://127.0.0.1:8787`.
 
+## Permissions
+
+Realtime voice planning may ask the browser for microphone access. Lesson Planner Q does not need system screen recording permission and does not capture the screen. If you do not want to grant microphone access, use typed planning instead.
+
 ## Evals
 
 Run the local agent-behavior evals with:
