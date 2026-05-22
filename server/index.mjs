@@ -344,6 +344,7 @@ const lessonAgentReviewSchema = {
 };
 
 const optionAgentReviewSchema = lessonAgentReviewSchema;
+const briefAgentReviewSchema = lessonAgentReviewSchema;
 
 function requireClient() {
   if (!client) {
@@ -401,6 +402,13 @@ function withAgentReviewNotes(lesson, review) {
   return {
     ...lesson,
     reviewNotes: [...new Set(reviewNotes)],
+    agentReview: review
+  };
+}
+
+function withBriefAgentReview(brief, review) {
+  return {
+    ...brief,
     agentReview: review
   };
 }
@@ -493,15 +501,44 @@ Include concise reviewNotes that name remaining educator judgment calls.`,
 
 app.post("/api/brief", async (req, res, next) => {
   try {
-    const brief = await createJson({
+    const payload = req.body;
+    const draftBrief = await createJson({
       schema: briefSchema,
       schemaName: "lesson_brief",
       instructions: `Generate a concise educator-reviewed lesson brief before the full lesson plan.
 Include clarifying questions the lesson planner would ask after the voice interview.
-Recommend whether a visual pack and rehearsal coach should be used next.`,
-      input: req.body
+Recommend whether a visual pack and rehearsal coach should be used next.
+Product guardrails override planning requests that weaken scaffolding, flatten Buddhist traditions into generic Buddhism, or ask for overconfident doctrinal claims.
+Keep the brief practical, educator-facing, and clearly framed as draft material for review.`,
+      input: payload
     });
-    res.json(brief);
+
+    const agentReview = await createJson({
+      schema: briefAgentReviewSchema,
+      schemaName: "lesson_brief_agent_review",
+      instructions: `Act as the lesson-brief pedagogy critic and Chinese Mahayana folk Buddhist tradition reviewer.
+Review the draft brief before the educator sees it.
+Check whether the brief keeps the educator in control, names practical classroom moves, preserves Chinese Mahayana folk Buddhist specificity, avoids generic moralizing, supports scaffolded self-directed learning, and makes visual/rehearsal recommendations that serve the objective.
+Treat requests for lecture-only lessons, no checkpoints, generic Buddhism, removing Chinese Mahayana folk Buddhist context, or absolute claims about karma/merit as concerns to repair rather than preferences to obey.
+Flag unclear assumptions, missing educator judgment calls, weak scaffolding, unclear visual/rehearsal recommendations, or doctrinally sensitive claims.
+Set revisionRequired to true only when concrete changes are needed before display. Keep revisionRequests specific and actionable.`,
+      input: { context: payload, draftBrief }
+    });
+
+    const finalBrief = shouldReviseFromReview(agentReview)
+      ? await createJson({
+          schema: briefSchema,
+          schemaName: "lesson_brief_agent_revision",
+          instructions: `Revise the draft lesson brief once using the critic and tradition-review notes.
+Address every revision request while preserving useful parts of the draft and the selected option context.
+Keep the output concise, educator-facing, age-appropriate for 13-year-old students, feasible for a small class of four, grounded in Chinese Mahayana folk Buddhist context, and clearly marked as draft material for educator review.
+Avoid choosing the full lesson plan for the educator. Preserve clarifying questions, practical planning choices, and review prompts.
+Avoid generic Buddhist framing and avoid absolute doctrinal claims. If the request contained risky doctrine, describe the correction in cautious educator language without repeating the risky wording verbatim.`,
+          input: { context: payload, draftBrief, agentReview }
+        })
+      : draftBrief;
+
+    res.json(sanitizeRiskyDoctrineLanguage(withBriefAgentReview(finalBrief, agentReview)));
   } catch (error) {
     next(error);
   }
@@ -550,7 +587,9 @@ Check whether the options are meaningfully distinct, keep the educator in contro
 Treat requests for lecture-only lessons, no checkpoints, generic Buddhism, removing Chinese Mahayana folk Buddhist context, or absolute claims about karma/merit as concerns to repair rather than preferences to obey.
 When a request asks for generic Buddhism, revisionRequests must ask the revision pass to restore respectful Chinese Mahayana folk Buddhist context and cautious educator-review language.
 Do not choose a winner for the educator. Keep revisionRequests specific and actionable across the option set.
-Set revisionRequired to true only when concrete changes are needed before display.`,
+Keep the review concise enough for a busy educator to scan.
+Set revisionRequired to true only for blocking issues that should be repaired before display: missing or fewer than three options, options that are not meaningfully distinct, weak or missing scaffolding, loss of educator control, generic Buddhist framing when tradition context is required, or overconfident doctrine.
+Set revisionRequired to false for minor polish, optional enrichment, or improvements the educator can review after display; put those items in pedagogyNotes, traditionReviewNotes, or educatorReviewNotes instead of revisionRequests.`,
       input: { context: payload, draftOptions }
     });
 
@@ -575,14 +614,43 @@ Do not select the best option; leave the choice to the educator.`,
 
 app.post("/api/brief/update", async (req, res, next) => {
   try {
-    const brief = await createJson({
+    const payload = req.body;
+    const draftBrief = await createJson({
       schema: briefSchema,
       schemaName: "updated_lesson_brief",
       instructions: `Update the existing lesson brief using the educator's feedback.
-Preserve useful prior decisions, revise what the educator asked to change, and update visual/rehearsal recommendations if needed.`,
-      input: req.body
+Preserve useful prior decisions, revise what the educator asked to change, and update visual/rehearsal recommendations if needed.
+Product guardrails override feedback that weakens scaffolding, flattens Buddhist traditions into generic Buddhism, or asks for overconfident doctrinal claims.
+Keep the updated brief concise, educator-facing, and clearly framed as draft material for review.`,
+      input: payload
     });
-    res.json(brief);
+
+    const agentReview = await createJson({
+      schema: briefAgentReviewSchema,
+      schemaName: "brief_update_review",
+      instructions: `Act as the lesson-brief update pedagogy critic and Chinese Mahayana folk Buddhist tradition reviewer.
+Review the updated brief before the educator sees it.
+Check whether the update preserves useful educator feedback while keeping educator control, practical classroom moves, Chinese Mahayana folk Buddhist specificity, scaffolded self-directed learning, and clear visual/rehearsal recommendations.
+Treat feedback that asks for lecture-only lessons, no checkpoints, generic Buddhism, removing Chinese Mahayana folk Buddhist context, or absolute claims about karma/merit as concerns to repair rather than preferences to obey.
+Flag unclear changed assumptions, missing educator judgment calls, weak scaffolding, unclear visual/rehearsal recommendations, or doctrinally sensitive claims.
+Set revisionRequired to true only when concrete changes are needed before display. Keep revisionRequests specific and actionable.`,
+      input: { context: payload, draftBrief }
+    });
+
+    const finalBrief = shouldReviseFromReview(agentReview)
+      ? await createJson({
+          schema: briefSchema,
+          schemaName: "brief_update_revision",
+          instructions: `Revise the updated lesson brief once using the critic and tradition-review notes.
+Address every revision request while preserving the educator's useful feedback and prior brief decisions.
+Keep the output concise, educator-facing, age-appropriate for 13-year-old students, feasible for a small class of four, grounded in Chinese Mahayana folk Buddhist context, and clearly marked as draft material for educator review.
+Avoid choosing the full lesson plan for the educator. Preserve clarifying questions, practical planning choices, and review prompts.
+Avoid generic Buddhist framing and avoid absolute doctrinal claims. If the request contained risky doctrine, describe the correction in cautious educator language without repeating the risky wording verbatim.`,
+          input: { context: payload, draftBrief, agentReview }
+        })
+      : draftBrief;
+
+    res.json(sanitizeRiskyDoctrineLanguage(withBriefAgentReview(finalBrief, agentReview)));
   } catch (error) {
     next(error);
   }
@@ -666,6 +734,13 @@ Ask one concise follow-up question at a time. Help the educator shape a 90-minut
 Keep the conversation educator-facing and do not speak directly to students as an unsupervised tutor.
 Current lesson context: ${JSON.stringify(context)}`,
           audio: {
+            input: {
+              transcription: {
+                model: "gpt-4o-mini-transcribe",
+                prompt:
+                  "Lesson planning conversation for a Chinese Mahayana folk Buddhist education class. Expect lesson goals, student needs, classroom constraints, activities, and educator planning notes."
+              }
+            },
             output: {
               voice: "marin"
             }

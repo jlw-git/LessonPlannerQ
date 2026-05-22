@@ -18,10 +18,13 @@ import {
   Save,
   Target,
   Trash2,
+  Volume2,
+  VolumeX,
   X,
   Wand2
 } from "lucide-react";
 import type {
+  BriefAgentReview,
   InterviewExtraction,
   LessonAgentReview,
   LessonBrief,
@@ -69,10 +72,9 @@ type ReflectionDraft = Omit<LessonReflection, "id">;
 const reflectionStorageKey = "lesson-planner-q-reflections";
 
 const initialForm: FormState = {
-  topic: "Compassion in daily life",
-  lessonObjectives: "Students can notice suffering in everyday situations and choose one compassionate response.",
-  planningRequirements:
-    "Students are energetic and enjoy role-play, but they can struggle to connect teachings to school life. Include movement, clear scaffolding, and practical school-life examples."
+  topic: "",
+  lessonObjectives: "",
+  planningRequirements: ""
 };
 
 function todayString() {
@@ -110,14 +112,24 @@ function loadReflections() {
 }
 
 async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const data = await readJsonResponse<{ error?: string } & T>(response, "Request failed");
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+  } catch (error) {
+    throw new Error(describeApiConnectionError(error));
+  }
+
+  const data = await readJsonResponse<{ error?: string | { message?: string }; message?: string } & T>(
+    response,
+    apiFallbackMessage(response, url)
+  );
   if (!response.ok) {
-    throw new Error(data.error || "Request failed");
+    throw new Error(extractApiErrorMessage(data) || apiFallbackMessage(response, url));
   }
   return data as T;
 }
@@ -136,8 +148,49 @@ async function readJsonResponse<T>(response: Response, fallbackMessage: string):
     return JSON.parse(text) as T;
   } catch {
     const preview = text.replace(/\s+/g, " ").trim().slice(0, 180);
-    throw new Error(preview || fallbackMessage);
+    if (!response.ok) {
+      throw new Error(preview || fallbackMessage);
+    }
+    throw new Error(`The API returned an unreadable response. ${preview || fallbackMessage}`);
   }
+}
+
+function apiFallbackMessage(response: Response, url: string) {
+  const route = url.replace(/^\/api\//, "");
+
+  if (response.status === 504 || response.status === 524) {
+    return `The ${route} request timed out. Try again, or check that the local API server is still running.`;
+  }
+
+  if (response.status === 502 || response.status === 503) {
+    return `The ${route} API is unavailable. Check that the local API server is running on port 8787.`;
+  }
+
+  return `${route} request failed with HTTP ${response.status}.`;
+}
+
+function extractApiErrorMessage(data: { error?: string | { message?: string }; message?: string }) {
+  if (typeof data.error === "string" && data.error.trim()) {
+    return data.error;
+  }
+
+  if (data.error && typeof data.error === "object" && typeof data.error.message === "string") {
+    return data.error.message;
+  }
+
+  if (typeof data.message === "string" && data.message.trim()) {
+    return data.message;
+  }
+
+  return null;
+}
+
+function describeApiConnectionError(error: unknown) {
+  if (error instanceof TypeError && /fetch|network|failed/i.test(error.message)) {
+    return "Could not reach the lesson-planning API. Make sure the API server is running on http://127.0.0.1:8787, then try again.";
+  }
+
+  return error instanceof Error ? error.message : "Could not reach the lesson-planning API.";
 }
 
 function List({ items }: { items: string[] }) {
@@ -156,7 +209,7 @@ function AgentReviewPanel({
   ariaLabel,
   noRevisionCopy
 }: {
-  review: LessonAgentReview | OptionAgentReview;
+  review: BriefAgentReview | LessonAgentReview | OptionAgentReview;
   title: string;
   ariaLabel: string;
   noRevisionCopy: string;
@@ -221,6 +274,17 @@ function OptionAgentReviewPanel({ review }: { review: OptionAgentReview }) {
       title="Option critic review"
       ariaLabel="Option critic review"
       noRevisionCopy="No required option revision after critic review."
+    />
+  );
+}
+
+function BriefAgentReviewPanel({ review }: { review: BriefAgentReview }) {
+  return (
+    <AgentReviewPanel
+      review={review}
+      title="Brief critic review"
+      ariaLabel="Brief critic review"
+      noRevisionCopy="No required brief revision after critic review."
     />
   );
 }
@@ -349,16 +413,20 @@ function LoadingState({ title, description }: { title: string; description: stri
 }
 
 function describeRealtimeError(err: unknown) {
+  if (err instanceof Error && /local api server|failed to fetch|load failed|networkerror/i.test(err.message)) {
+    return err.message;
+  }
+
   if (err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "SecurityError")) {
-    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type the brief\".";
+    return "Microphone access is blocked for this browser. Check site permissions for this preview, or use \"Write it out\".";
   }
 
   if (err instanceof DOMException && err.name === "NotFoundError") {
-    return "No microphone was found. Connect or enable a microphone, or use \"Type the brief\".";
+    return "No microphone was found. Connect or enable a microphone, or use \"Write it out\".";
   }
 
   if (err instanceof Error && /permission denied|notallowed/i.test(err.message)) {
-    return "Microphone permission was denied. Allow microphone access for this browser or use \"Type the brief\".";
+    return "Microphone access is blocked for this browser. Check site permissions for this preview, or use \"Write it out\".";
   }
 
   return err instanceof Error ? err.message : "Could not start realtime voice session";
@@ -387,6 +455,7 @@ export default function App() {
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [interviewDraft, setInterviewDraft] = useState<InterviewExtraction | null>(null);
   const [interviewApplied, setInterviewApplied] = useState(false);
+  const [plannerMuted, setPlannerMuted] = useState(false);
   const realtimePeer = useRef<RTCPeerConnection | null>(null);
   const realtimeStream = useRef<MediaStream | null>(null);
   const realtimeAudio = useRef<HTMLAudioElement | null>(null);
@@ -397,33 +466,23 @@ export default function App() {
   const workflowSteps: FlowStep[] = [
     {
       label: "Start",
-      detail: voiceSignal === "listening" || voiceSignal === "speaking" ? "Voice planning live" : "Voice or typed brief",
+      detail: voiceSignal === "listening" || voiceSignal === "speaking" ? "Voice planning live" : "Voice conversation",
       status: lessonOptions.length > 0 || brief || rehearsal || lesson ? "done" : "active"
     },
     {
-      label: "Options",
+      label: "Choose",
       detail: lessonOptions.length > 0 ? `${lessonOptions.length} approaches ready` : "Compare approaches",
       status: brief || rehearsal || lesson ? "done" : lessonOptions.length > 0 || loading === "options" ? "active" : "idle"
     },
     {
-      label: "Brief",
-      detail: brief ? "Draft ready to refine" : "Choose one direction",
-      status: rehearsal || lesson ? "done" : brief || loading === "brief" || loading === "brief-update" ? "active" : "idle"
+      label: "Prepare",
+      detail: rehearsal ? "Rehearsal ready" : brief ? "Brief ready" : "Brief and rehearsal",
+      status: lesson ? "done" : brief || rehearsal || loading === "brief" || loading === "brief-update" || loading === "rehearsal" ? "active" : "idle"
     },
     {
-      label: "Rehearse",
-      detail: rehearsal ? "Coach notes ready" : "Practice tricky wording",
-      status: lesson ? "done" : rehearsal || loading === "rehearsal" ? "active" : "idle"
-    },
-    {
-      label: "Full Plan",
-      detail: lesson ? "90-minute plan drafted" : "Build the lesson",
-      status: lesson ? "done" : loading === "lesson" ? "active" : "idle"
-    },
-    {
-      label: "Visuals",
-      detail: visuals ? "Material pack ready" : "Cards and prompts",
-      status: visuals ? "done" : loading === "visuals" || loading === "image" ? "active" : "idle"
+      label: "Build",
+      detail: visuals ? "Plan and visuals ready" : lesson ? "90-minute plan drafted" : "Full plan and visuals",
+      status: lesson || visuals ? "done" : loading === "lesson" || loading === "visuals" || loading === "image" ? "active" : "idle"
     },
     {
       label: "Reflection",
@@ -431,33 +490,6 @@ export default function App() {
       status: showLessonMemory ? "active" : "idle"
     }
   ];
-
-  const voiceStatusCopy: Record<VoiceSignal, { title: string; detail: string }> = {
-    idle: {
-      title: "Ready",
-      detail: "Start a live planning conversation when you want to think aloud."
-    },
-    connecting: {
-      title: "Connecting",
-      detail: "Getting a secure voice session ready and waiting for microphone access."
-    },
-    listening: {
-      title: "Listening",
-      detail: "PlannerQ is listening. Speak naturally about the lesson."
-    },
-    speaking: {
-      title: "Speaking",
-      detail: "PlannerQ is responding. The transcript updates as text arrives."
-    },
-    "permission-error": {
-      title: "Microphone blocked",
-      detail: "Allow microphone access in the browser or use the typed brief fallback."
-    },
-    "api-error": {
-      title: "Voice setup failed",
-      detail: "The voice service could not start. Try again, or continue with the typed brief."
-    }
-  };
 
   const requestPayload = useMemo(
     () => ({
@@ -744,6 +776,16 @@ export default function App() {
     setVoiceSignal("idle");
   };
 
+  const togglePlannerAudio = () => {
+    setPlannerMuted((current) => {
+      const next = !current;
+      if (realtimeAudio.current) {
+        realtimeAudio.current.muted = next;
+      }
+      return next;
+    });
+  };
+
   const addTranscript = (entry: Omit<TranscriptEntry, "id">) => {
     setTranscript((current) => [
       ...current,
@@ -806,6 +848,15 @@ export default function App() {
         return;
       }
 
+      if (type === "conversation.item.input_audio_transcription.delta") {
+        setVoiceSignal("listening");
+        const id = data.item_id || "educator-live";
+        if (typeof data.delta === "string") {
+          upsertTranscript(id, "educator", data.delta, "append");
+        }
+        return;
+      }
+
       if (type === "conversation.item.created") {
         const role = data.item?.role === "user" ? "educator" : "planner";
         const content = data.item?.content?.find((part: { transcript?: string; text?: string }) => part.transcript || part.text);
@@ -832,11 +883,19 @@ export default function App() {
     setTranscript([]);
     setInterviewDraft(null);
     setInterviewApplied(false);
-    addTranscript({
-      role: "planner",
-      text: "Starting voice planning. Allow microphone access if your browser asks."
-    });
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("This browser does not support microphone access here. Use a browser with microphone support, or choose \"Write it out\".");
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      realtimeStream.current = stream;
+
+      const healthResponse = await fetch("/api/health");
+      if (!healthResponse.ok) {
+        throw new Error("Local API server is not running. Start the API server, then try voice planning again.");
+      }
+
       const tokenResponse = await fetch("/api/realtime/client-secret", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -862,22 +921,17 @@ export default function App() {
 
       const audio = document.createElement("audio");
       audio.autoplay = true;
+      audio.muted = plannerMuted;
       realtimeAudio.current = audio;
       peer.ontrack = (event) => {
         audio.srcObject = event.streams[0];
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      realtimeStream.current = stream;
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
 
       const channel = peer.createDataChannel("oai-events");
       channel.addEventListener("message", handleRealtimeEvent);
       channel.addEventListener("open", () => {
-        addTranscript({
-          role: "planner",
-          text: "Connected. The planner will ask clarifying questions one at a time."
-        });
         channel.send(
           JSON.stringify({
             type: "conversation.item.create",
@@ -917,10 +971,6 @@ export default function App() {
       });
       setRealtimeStatus("live");
       setVoiceSignal("listening");
-      addTranscript({
-        role: "planner",
-        text: "Voice interview is live. Speak naturally; the transcript will appear here when text events are available."
-      });
     } catch (err) {
       stopRealtime();
       setVoiceSignal(describeRealtimeError(err).toLowerCase().includes("microphone") ? "permission-error" : "api-error");
@@ -929,11 +979,13 @@ export default function App() {
   };
 
   const selectedOption = selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex] ?? null;
-  const currentFocus = brief?.title || selectedOption?.title || form.topic;
   const hasPlanContext = Boolean(brief || selectedOption || lessonOptions.length > 0);
+  const showPlanningShortcuts = hasPlanContext || lesson || rehearsal || visuals || showLessonMemory || reflections.length > 0;
+  const showWorkflowRail = Boolean(lesson);
+  const hasTypedBrief = Boolean(form.topic.trim() || form.lessonObjectives.trim() || form.planningRequirements.trim());
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${showWorkflowRail ? "with-workflow" : "without-workflow"}`}>
       <aside className="app-sidebar">
         <div className="brand-lockup">
           <span className="brand-mark">
@@ -941,7 +993,7 @@ export default function App() {
           </span>
           <strong>Lesson Planner Q</strong>
         </div>
-        <WorkflowRail steps={workflowSteps} />
+        {showWorkflowRail && <WorkflowRail steps={workflowSteps} />}
         <div className="sidebar-footer">
           <span>Educator workspace</span>
           <strong>{reflections.length} saved reflections</strong>
@@ -949,113 +1001,73 @@ export default function App() {
       </aside>
 
       <div className="planner-workspace">
-        <header className="workspace-header">
-          <div>
-            <div className="topic-line">
-              <h1>{currentFocus}</h1>
-              <button
-                className="icon-button quiet-button"
-                aria-label="Edit lesson topic"
-                onClick={() => document.querySelector<HTMLInputElement>("input")?.focus()}
-              >
-                <Pencil size={16} />
-              </button>
-            </div>
-            <div className="context-chips" aria-label="Lesson context">
-              <span>90 min</span>
-              <span>Age 13</span>
-              <span>Small class</span>
-              <span>Chinese Mahayana folk Buddhism</span>
-            </div>
-          </div>
-          <div className="header-actions">
-            <button className="quiet-button" onClick={() => setShowLessonMemory(true)}>
-              <NotebookPen size={18} />
-              Lesson memory
-            </button>
-            <button onClick={generateOptions} disabled={Boolean(loading)} className="primary">
-              {loading === "options" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
-              Generate options
-            </button>
-          </div>
-        </header>
-
-        <div className="planner-grid">
+        <div className={`planner-grid ${showPlanningShortcuts ? "with-shortcuts" : "solo"}`}>
           <section className="planner-main">
 
         {realtimeStatus === "idle" && (
           <section className="brief-composer feature-section" aria-label="Start lesson plan">
             <div className="composer-head">
               <div className="section-title">
-                <FileText size={22} />
-                <h2>Start the lesson plan</h2>
+                <NotebookPen size={22} />
+                <h2>Let&apos;s plan</h2>
               </div>
-              <p>Begin with voice when you want to think aloud, or use the typed brief when you already know the shape.</p>
+              <p>Share three things: lesson goal, what students are like, and any must-haves or limits.</p>
             </div>
 
-            <div className="start-grid">
-              <section className={`voice-card ${voiceSignal.includes("error") ? "has-error" : ""}`}>
-                <div className="start-card-head">
-                  <div className="section-title voice-title">
-                    <Mic size={22} />
-                    <h3>Talk with PlannerQ</h3>
-                  </div>
-                  <span className={`voice-status ${voiceSignal}`}>{voiceStatusCopy[voiceSignal].title}</span>
-                </div>
-                <p>{voiceStatusCopy[voiceSignal].detail}</p>
-                <div className="voice-state-meter" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-                <button onClick={startRealtime} className="voice-primary" disabled={Boolean(loading)}>
+            <div className="start-stack">
+              <section className={`voice-primary-card mic-cta ${voiceSignal.includes("error") ? "has-error" : ""}`} aria-label="Voice planning">
+                <button onClick={startRealtime} className="primary voice-start-button" disabled={Boolean(loading)}>
                   <Mic size={18} />
-                  Start voice planning
+                  Talk it through
                 </button>
               </section>
 
-              <section className="typed-brief fallback-card" aria-label="Typed brief fallback">
-                <div className="start-card-head">
-                  <div className="section-title">
-                    <FileText size={22} />
-                    <h3>Type the brief</h3>
+              <details className="typed-brief secondary-brief-card">
+                <summary>
+                  <FileText size={18} />
+                  <span>Write it out</span>
+                </summary>
+
+                <div className="typed-fallback-fields">
+                  <label>
+                    Lesson goal
+                    <input
+                      value={form.topic}
+                      onChange={(event) => update("topic", event.target.value)}
+                      placeholder="Example: compassion in daily life"
+                    />
+                  </label>
+
+                  <label>
+                    <Target size={16} />
+                    What students should learn
+                    <textarea
+                      value={form.lessonObjectives}
+                      onChange={(event) => update("lessonObjectives", event.target.value)}
+                      rows={2}
+                      placeholder="What should students understand or be able to do?"
+                    />
+                  </label>
+
+                  <label>
+                    <MessageCircle size={16} />
+                    Students, must-haves, and limits
+                    <textarea
+                      value={form.planningRequirements}
+                      onChange={(event) => update("planningRequirements", event.target.value)}
+                      rows={3}
+                      placeholder="Student needs, activity preferences, materials, timing, or limits."
+                    />
+                  </label>
+
+                  <div className="typed-actions">
+                    <button onClick={generateOptions} disabled={Boolean(loading) || !hasTypedBrief} className="primary">
+                      {loading === "options" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+                      {lessonOptions.length > 0 ? "Regenerate lesson options" : "Generate lesson options"}
+                    </button>
                   </div>
-                  <span className="fallback-badge">Fallback</span>
                 </div>
-                <p className="muted">Use this when you are in a quiet place, microphone access is blocked, or you already have a brief.</p>
-
-                <label>
-                  Topic
-                  <input value={form.topic} onChange={(event) => update("topic", event.target.value)} />
-                </label>
-
-                <label>
-                  <Target size={16} />
-                  Lesson objectives
-                  <textarea
-                    value={form.lessonObjectives}
-                    onChange={(event) => update("lessonObjectives", event.target.value)}
-                    rows={3}
-                  />
-                </label>
-
-                <label>
-                  <MessageCircle size={16} />
-                  Planning requirements
-                  <textarea
-                    value={form.planningRequirements}
-                    onChange={(event) => update("planningRequirements", event.target.value)}
-                    rows={4}
-                  />
-                </label>
-
-                <div className="typed-actions">
-                  <button onClick={generateOptions} disabled={Boolean(loading)} className="primary">
-                    {loading === "options" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                    {lessonOptions.length > 0 ? "Regenerate options" : "See lesson options"}
-                  </button>
-                </div>
-              </section>
+              </details>
             </div>
           </section>
         )}
@@ -1078,39 +1090,57 @@ export default function App() {
               <span>Planning chat</span>
               <strong>{realtimeStatus === "connecting" ? "Connecting" : "Live"}</strong>
             </div>
-            <div className="voice-stage-center">
-              <button onClick={startRealtime} className="stage-mic" aria-label="End voice planning">
-                <Mic size={42} />
-              </button>
-              <p>{realtimeStatus === "connecting" ? "Connecting to PlannerQ..." : "PlannerQ is listening"}</p>
-              <button onClick={stopRealtime} className="end-session">
-                End chat
-              </button>
+
+            <div className="conversation-shell">
+              <div className="voice-stage-center">
+                <button onClick={startRealtime} className="stage-mic" aria-label="End voice planning">
+                  <Mic size={24} />
+                </button>
+                <p>{realtimeStatus === "connecting" ? "Connecting to PlannerQ..." : "PlannerQ is listening"}</p>
+                <button
+                  aria-pressed={plannerMuted}
+                  className="quiet-button compact-button mute-output-button"
+                  onClick={togglePlannerAudio}
+                >
+                  {plannerMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                  {plannerMuted ? "Unmute PlannerQ" : "Mute PlannerQ"}
+                </button>
+                <button onClick={stopRealtime} className="end-session">
+                  End
+                </button>
+              </div>
+
+              <aside className="transcript-drawer">
+                <div className="transcript-head">
+                  <h2>Conversation</h2>
+                  {hasEducatorTranscript && (
+                    <button onClick={extractInterviewNotes} disabled={Boolean(loading)} className="quiet-button compact-button">
+                      {loading === "interview-extract" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
+                      Use notes
+                    </button>
+                  )}
+                </div>
+                <div className="transcript-log" ref={transcriptRef}>
+                  {transcript.length === 0 ? (
+                    <p className="conversation-empty">
+                      The dialogue will appear here as PlannerQ speaks and your microphone input is transcribed.
+                    </p>
+                  ) : (
+                    transcript.map((entry) => (
+                      <article className={entry.role} key={entry.id}>
+                        <strong>{entry.role === "educator" ? "You" : "PlannerQ"}</strong>
+                        <p>{entry.text}</p>
+                      </article>
+                    ))
+                  )}
+                </div>
+              </aside>
             </div>
-            <aside className="transcript-drawer">
-              <div className="transcript-head">
-                <h2>Transcript</h2>
-                {hasEducatorTranscript && (
-                  <button onClick={extractInterviewNotes} disabled={Boolean(loading)} className="quiet-button compact-button">
-                    {loading === "interview-extract" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
-                    Use interview notes
-                  </button>
-                )}
-              </div>
-              <div className="transcript-log" ref={transcriptRef}>
-                {transcript.map((entry) => (
-                  <article className={entry.role} key={entry.id}>
-                    <strong>{entry.role === "educator" ? "You" : "PlannerQ"}</strong>
-                    <p>{entry.text}</p>
-                  </article>
-                ))}
-              </div>
-            </aside>
           </section>
         )}
 
         <div className="content" ref={outputRef}>
-          {realtimeStatus === "idle" && transcript.length > 0 && !interviewApplied && (
+          {realtimeStatus === "idle" && hasEducatorTranscript && !interviewApplied && (
             <section className="inline-draft interview-ready-card">
               <div>
                 <span className="section-eyebrow">Voice interview</span>
@@ -1138,17 +1168,6 @@ export default function App() {
               title="Extracting interview notes"
               description="Turning the voice transcript into editable planning fields for educator review."
             />
-          )}
-
-          {!loading && transcript.length === 0 && !interviewDraft && lessonOptions.length === 0 && !brief && !lesson && !rehearsal && (
-            <section className="empty-state guided-empty">
-              <FileText size={28} />
-              <h2>Your planning path will appear here</h2>
-              <p>
-                Start with voice or the typed brief. PlannerQ will create comparable lesson approaches first, then guide
-                you through the brief, rehearsal, full plan, and reflection.
-              </p>
-            </section>
           )}
 
           {loading === "options" && (
@@ -1305,6 +1324,8 @@ export default function App() {
                   <p>{brief.studentTakeaway}</p>
                 </div>
               </div>
+
+              {brief.agentReview && <BriefAgentReviewPanel review={brief.agentReview} />}
 
               <div className="two-col">
                 <div>
@@ -1743,69 +1764,71 @@ export default function App() {
         </div>
           </section>
 
-          <aside className="context-panel" aria-label="Planning shortcuts">
-            <section className="context-card">
-              <div className="context-card-head">
-                <div className="section-title compact">
-                  <NotebookPen size={20} />
-                  <h2>Lesson memory</h2>
+          {showPlanningShortcuts && (
+            <aside className="context-panel" aria-label="Planning shortcuts">
+              <section className="context-card">
+                <div className="context-card-head">
+                  <div className="section-title compact">
+                    <NotebookPen size={20} />
+                    <h2>Lesson memory</h2>
+                  </div>
+                  <span>{reflections.length}</span>
                 </div>
-                <span>{reflections.length}</span>
-              </div>
-              <p>Recent reflections become classroom evidence for the next plan.</p>
-              <button className="context-action" onClick={() => setShowLessonMemory((current) => !current)}>
-                <Save size={18} />
-                {showLessonMemory ? "Hide memory form" : "Log reflection"}
-              </button>
-            </section>
+                <p>Recent reflections become classroom evidence for the next plan.</p>
+                <button className="context-action" onClick={() => setShowLessonMemory((current) => !current)}>
+                  <Save size={18} />
+                  {showLessonMemory ? "Hide memory form" : "Log reflection"}
+                </button>
+              </section>
 
-            <section className="context-card">
-              <div className="context-card-head">
-                <div className="section-title compact">
-                  <Mic size={20} />
-                  <h2>Rehearse</h2>
+              <section className="context-card">
+                <div className="context-card-head">
+                  <div className="section-title compact">
+                    <Mic size={20} />
+                    <h2>Rehearse</h2>
+                  </div>
+                  <span>{rehearsal ? "Ready" : "Next"}</span>
                 </div>
-                <span>{rehearsal ? "Ready" : "Next"}</span>
-              </div>
-              <p>Practice likely student questions before turning the brief into a full plan.</p>
-              <button className="context-action" onClick={generateRehearsal} disabled={Boolean(loading) || !hasPlanContext}>
-                {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <MessageCircle size={18} />}
-                Start rehearsal
-              </button>
-            </section>
+                <p>Practice likely student questions before turning the brief into a full plan.</p>
+                <button className="context-action" onClick={generateRehearsal} disabled={Boolean(loading) || !hasPlanContext}>
+                  {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <MessageCircle size={18} />}
+                  Start rehearsal
+                </button>
+              </section>
 
-            <section className="context-card">
-              <div className="context-card-head">
-                <div className="section-title compact">
-                  <CheckCircle2 size={20} />
-                  <h2>Next actions</h2>
+              <section className="context-card">
+                <div className="context-card-head">
+                  <div className="section-title compact">
+                    <CheckCircle2 size={20} />
+                    <h2>Next actions</h2>
+                  </div>
                 </div>
-              </div>
-              <div className="next-action-list">
-                <button onClick={generateBrief} disabled={Boolean(loading) || selectedOptionIndex === null}>
-                  <FileText size={18} />
-                  <span>
-                    <strong>Draft brief</strong>
-                    <small>{brief ? "Refresh the current brief" : "Use the selected option"}</small>
-                  </span>
-                </button>
-                <button onClick={generateLesson} disabled={Boolean(loading) || !brief}>
-                  <BookOpen size={18} />
-                  <span>
-                    <strong>Draft full plan</strong>
-                    <small>Create the 90-minute lesson</small>
-                  </span>
-                </button>
-                <button onClick={generateVisuals} disabled={Boolean(loading) || !brief}>
-                  <Image size={18} />
-                  <span>
-                    <strong>Create visuals</strong>
-                    <small>Cards, prompts, and image direction</small>
-                  </span>
-                </button>
-              </div>
-            </section>
-          </aside>
+                <div className="next-action-list">
+                  <button onClick={generateBrief} disabled={Boolean(loading) || selectedOptionIndex === null}>
+                    <FileText size={18} />
+                    <span>
+                      <strong>Draft brief</strong>
+                      <small>{brief ? "Refresh the current brief" : "Use the selected option"}</small>
+                    </span>
+                  </button>
+                  <button onClick={generateLesson} disabled={Boolean(loading) || !brief}>
+                    <BookOpen size={18} />
+                    <span>
+                      <strong>Draft full plan</strong>
+                      <small>Create the 90-minute lesson</small>
+                    </span>
+                  </button>
+                  <button onClick={generateVisuals} disabled={Boolean(loading) || !brief}>
+                    <Image size={18} />
+                    <span>
+                      <strong>Create visuals</strong>
+                      <small>Cards, prompts, and image direction</small>
+                    </span>
+                  </button>
+                </div>
+              </section>
+            </aside>
+          )}
         </div>
       </div>
     </main>

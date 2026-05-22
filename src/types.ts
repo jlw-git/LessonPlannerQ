@@ -42,6 +42,7 @@ export type LessonAgentReview = {
 };
 
 export type OptionAgentReview = LessonAgentReview;
+export type BriefAgentReview = LessonAgentReview;
 
 export type LessonBrief = {
   title: string;
@@ -56,6 +57,7 @@ export type LessonBrief = {
   rehearsalFocus: string;
   changeLog: string[];
   reviewPrompts: string[];
+  agentReview?: BriefAgentReview;
 };
 
 export type InterviewExtraction = {
@@ -105,4 +107,18 @@ export type Rehearsal = {
   suggestedResponses: string[];
   simplerLanguage: string[];
   coachingNotes: string[];
+};
+
+export type RehearsalCritique = {
+  practicedQuestion: string;
+  educatorAttempt: string;
+  summary: string;
+  strengths: string[];
+  clarityNotes: string[];
+  toneAndAgeFitNotes: string[];
+  traditionCautionNotes: string[];
+  suggestedRevision: string;
+  nextPracticePrompt: string;
+  briefFeedbackSuggestion: string;
+  educatorReviewNotes: string[];
 };

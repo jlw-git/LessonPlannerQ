@@ -24,8 +24,8 @@ The current teaching context assumes:
 
 - Generate three distinct lesson-planning options before committing to a plan.
 - Review generated lesson options with a pedagogy critic and tradition reviewer, revise once when needed, and show a concise educator-facing option review.
-- Generate a concise lesson brief with clarifying questions and planning choices.
-- Update the brief from educator feedback.
+- Generate a concise lesson brief with clarifying questions and planning choices, then review and revise it once when needed.
+- Update the brief from educator feedback, then review and revise the update once when needed.
 - Generate a full lesson plan with objectives, lesson flow, play-based activity, gradual-release self-directed learning, reflection prompts, and educator notes.
 - Review generated full lesson plans with a pedagogy critic and tradition reviewer, revise once when needed, and show educator-facing review notes.
 - Generate a visual material pack with image prompt, story cards, scenario cards, value cards, storyboard panels, worksheet prompts, and review notes.
@@ -67,7 +67,7 @@ LLM-backed behavior:
 - `/api/options` asks the text model to generate exactly three comparable lesson approaches.
 - `/api/options` then runs a structured option review over the draft options and performs one revision pass when the critic requests changes.
 - `/api/interview/extract` asks the text model to convert a voice transcript into editable `topic`, `lessonObjectives`, and `planningRequirements` fields plus review notes.
-- `/api/brief` and `/api/brief/update` ask the text model to draft or revise structured lesson briefs.
+- `/api/brief` and `/api/brief/update` ask the text model to draft or revise structured lesson briefs, then run critic/tradition review and one revision pass before returning the brief plus `agentReview`.
 - `/api/lesson` asks the text model to draft the full 90-minute lesson plan.
 - `/api/lesson` then runs a structured agent review over the draft plan and performs one revision pass when the critic requests changes.
 - `/api/visuals` asks the text model to draft printable material guidance, story/scenario cards, worksheet prompts, storyboard panels, review notes, and the image prompt.
@@ -88,15 +88,16 @@ Rules-based and deterministic behavior:
 
 ## How It Works
 
-The main planning flow starts in `src/App.tsx`. The frontend is organized as a planning cockpit: a persistent workflow rail, a central planning workspace, and a compact context panel for lesson memory, rehearsal, and next actions.
+The main planning flow starts in `src/App.tsx`. The frontend is organized as a streamlined planning workspace: a voice-first start brief, a compact context panel for lesson memory, rehearsal, and next actions that appears once there is planning context or saved memory to act on, and a workflow rail that appears after a full lesson plan exists.
 
 1. The educator enters a topic, objectives, and planning requirements, or starts a realtime voice planning session.
-2. If the educator uses voice, the transcript can be extracted into editable planning fields and applied only after educator review.
-3. The frontend builds a request payload containing the form state, the selected lesson option when present, and up to five recent saved lesson reflections.
-4. The frontend calls the Express API routes under `/api`.
-5. The server sends stable product instructions plus task-specific instructions to OpenAI.
-6. Text routes request strict JSON schema output so the frontend can render typed lesson artifacts.
-7. The educator can compare options, refine a brief, generate a full plan, create visuals, rehearse explanations, and save reflections after the lesson.
+2. The initial screen presents voice planning as the primary path for thinking aloud with PlannerQ, while the typed brief stays available as a secondary fallback.
+3. If the educator uses voice, the transcript can be extracted into editable planning fields and applied only after educator review.
+4. The frontend builds a request payload containing the form state, the selected lesson option when present, and up to five recent saved lesson reflections.
+5. The frontend calls the Express API routes under `/api`.
+6. The server sends stable product instructions plus task-specific instructions to OpenAI.
+7. Text routes request strict JSON schema output so the frontend can render typed lesson artifacts.
+8. The educator can compare options, refine a brief, generate a full plan, create visuals, rehearse explanations, and save reflections after the lesson.
 
 Saved reflections are stored in browser `localStorage` under `lesson-planner-q-reflections`. The app keeps up to 20 saved reflections and sends the five most recent into future planning requests as classroom evidence.
 
@@ -104,7 +105,7 @@ Saved reflections are stored in browser `localStorage` under `lesson-planner-q-r
 
 The intended evolution is not to make every screen autonomous. Lesson Planner Q should remain a deterministic educator-controlled workflow, with specialized agents used where they improve planning quality: interviewing, drafting, critique, revision, rehearsal, and memory synthesis.
 
-The first implemented slices are server-side critic review and one-pass revision for lesson options and full lesson plans. The reflection memory agent and structured interview extraction should follow later.
+The implemented slices include structured interview extraction plus server-side critic review and one-pass revision for lesson options, lesson briefs, and full lesson plans. The reflection memory agent should follow later.
 
 The target agentic loop is:
 
@@ -115,8 +116,8 @@ The target agentic loop is:
 5. Option agent revises weak options before showing them.
 6. Educator selects one.
 7. Brief/plan agent drafts.
-8. Critic reviews the full plan.
-9. Plan agent revises once.
+8. Critic reviews the brief and full plan.
+9. Brief/plan agent revises once when needed.
 10. Educator sees the draft plus review notes.
 11. Rehearsal agent helps the educator practice.
 12. After class, reflection agent summarizes classroom evidence into memory.
@@ -128,9 +129,9 @@ Agent roles:
 
 - Interview agent: turns voice or typed planning into structured context and clarifying questions. Future work.
 - Option agent: creates distinct lesson approaches and revises weak options after critique. Implemented for lesson options.
-- Pedagogy critic: checks whether play, visuals, self-directed learning, timeboxes, and classroom moves serve the lesson objective. Implemented for lesson options and full lesson plans.
-- Tradition reviewer: flags generic Buddhist framing, cultural flattening, doctrinal overclaiming, or places needing educator/temple review. Implemented for lesson options and full lesson plans.
-- Brief/plan agent: drafts the educator-reviewed brief and full lesson plan from the selected option and critique. Implemented for full lesson plan revision; brief critique remains future work.
+- Pedagogy critic: checks whether play, visuals, self-directed learning, timeboxes, and classroom moves serve the lesson objective. Implemented for lesson options, lesson briefs, and full lesson plans.
+- Tradition reviewer: flags generic Buddhist framing, cultural flattening, doctrinal overclaiming, or places needing educator/temple review. Implemented for lesson options, lesson briefs, and full lesson plans.
+- Brief/plan agent: drafts the educator-reviewed brief and full lesson plan from the selected option and critique. Implemented for brief and full lesson plan revision.
 - Rehearsal agent: helps the educator practice likely student questions, simpler language, and difficult explanations. Current rehearsal route drafts coaching; live attempt critique remains future work.
 - Reflection memory agent: summarizes saved after-class reflections into inspectable classroom evidence for future planning. Future work.
 
@@ -152,8 +153,8 @@ Agent roles:
 - `GET /api/health`: returns API health, model names, key presence, and prompt-cache configuration.
 - `POST /api/options`: generates three lesson-planning options, then runs critic/tradition review and one revision pass before returning the options plus `optionReview`.
 - `POST /api/interview/extract`: extracts voice transcript notes into editable planning fields plus open questions, confidence notes, and a source summary.
-- `POST /api/brief`: generates the initial lesson brief.
-- `POST /api/brief/update`: updates an existing brief using educator feedback.
+- `POST /api/brief`: generates the initial lesson brief, then runs critic/tradition review and one revision pass before returning the brief plus `agentReview`.
+- `POST /api/brief/update`: updates an existing brief using educator feedback, then runs critic/tradition review and one revision pass before returning the brief plus `agentReview`.
 - `POST /api/lesson`: generates the full lesson plan, then runs critic/tradition review and one revision pass before returning the plan plus `agentReview`.
 - `POST /api/visuals`: generates the printable visual material pack.
 - `POST /api/rehearsal`: generates educator rehearsal coaching.
@@ -178,6 +179,17 @@ The runner imports the Express app, starts it on an ephemeral local port, sends 
 - Use play and visuals only when they support the learning goal.
 - Scaffold self-directed learning with clear goals, choices, timeboxes, check-ins, and reflection.
 - Use lesson reflections as evidence from the actual classroom, not as decorative history.
+
+## Next Build Priorities
+
+Current implementation priorities, in order:
+
+1. Polish the core weekly planning loop: voice or typed input, reviewed options, selected brief, rehearsal, full plan, visual/export, and reflection.
+2. Add editable and exportable lesson artifacts, starting with printable lesson plans and visual packs.
+3. Upgrade rehearsal from static coaching into a practice loop where the educator can try an explanation and receive feedback on clarity, tone, age fit, and doctrinal caution.
+4. Build reflection memory synthesis so saved reflections become inspectable classroom evidence, not only raw local notes passed into prompts.
+5. Add a small curated Buddhist and pedagogy reference layer to improve trust, source quality, and tradition-specific planning.
+6. Instrument MVP success metrics such as time to usable plan, option selection, brief refinement, rehearsal use, visual generation, reflection save rate, and repeat weekly use.
 
 ## Known Gaps
 

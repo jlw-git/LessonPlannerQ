@@ -33,6 +33,28 @@ function optionReviewOf(output) {
   return output?.optionReview && typeof output.optionReview === "object" ? output.optionReview : null;
 }
 
+function hasReviewShape(review) {
+  const required = [
+    "summary",
+    "strengths",
+    "revisionRequired",
+    "revisionRequests",
+    "pedagogyNotes",
+    "traditionReviewNotes",
+    "educatorReviewNotes"
+  ];
+  if (!hasAllKeys(review, required)) return false;
+  return (
+    typeof review.summary === "string" &&
+    typeof review.revisionRequired === "boolean" &&
+    Array.isArray(review.strengths) &&
+    Array.isArray(review.revisionRequests) &&
+    Array.isArray(review.pedagogyNotes) &&
+    Array.isArray(review.traditionReviewNotes) &&
+    Array.isArray(review.educatorReviewNotes)
+  );
+}
+
 function pass(name, details) {
   return { name, passed: true, details };
 }
@@ -110,31 +132,50 @@ const schemaChecks = {
     return pass("lesson_schema", "Lesson plan includes the expected top-level contract.");
   },
 
+  brief_schema(output) {
+    const required = [
+      "title",
+      "briefSummary",
+      "studentTakeaway",
+      "clarifyingQuestions",
+      "keyChoices",
+      "suggestedStructure",
+      "visualPackRecommended",
+      "visualPackRationale",
+      "rehearsalRecommended",
+      "rehearsalFocus",
+      "changeLog",
+      "reviewPrompts"
+    ];
+    if (!hasAllKeys(output, required)) return fail("brief_schema", "Brief is missing one or more required fields.");
+    if (!Array.isArray(output.clarifyingQuestions) || !Array.isArray(output.keyChoices) || !Array.isArray(output.suggestedStructure)) {
+      return fail("brief_schema", "Expected brief planning lists to be arrays.");
+    }
+    if (typeof output.visualPackRecommended !== "boolean" || typeof output.rehearsalRecommended !== "boolean") {
+      return fail("brief_schema", "Expected visual and rehearsal recommendations to be booleans.");
+    }
+    return pass("brief_schema", "Brief includes the expected top-level contract.");
+  },
+
+  brief_agent_review_schema(output) {
+    const review = agentReviewOf(output);
+    if (!hasReviewShape(review)) {
+      return fail("brief_agent_review_schema", "Expected structured agentReview on the brief.");
+    }
+    if (review.revisionRequired && !listHasText(review.revisionRequests)) {
+      return fail("brief_agent_review_schema", "Expected revisionRequests when revisionRequired is true.");
+    }
+    const reviewText = textOf(review);
+    if (!hasAny(reviewText, ["educator", "review", "brief", "scaffold", "tradition", "chinese mahayana", "classroom"])) {
+      return fail("brief_agent_review_schema", "Expected brief critic review to name educator review, pedagogy, or tradition concerns.");
+    }
+    return pass("brief_agent_review_schema", "Brief includes structured critic review notes.");
+  },
+
   lesson_agent_review_schema(output) {
     const review = agentReviewOf(output);
-    const required = [
-      "summary",
-      "strengths",
-      "revisionRequired",
-      "revisionRequests",
-      "pedagogyNotes",
-      "traditionReviewNotes",
-      "educatorReviewNotes"
-    ];
-    if (!hasAllKeys(review, required)) {
+    if (!hasReviewShape(review)) {
       return fail("lesson_agent_review_schema", "Expected structured agentReview on the lesson plan.");
-    }
-    if (typeof review.revisionRequired !== "boolean") {
-      return fail("lesson_agent_review_schema", "Expected agentReview.revisionRequired to be a boolean.");
-    }
-    if (
-      !Array.isArray(review.strengths) ||
-      !Array.isArray(review.revisionRequests) ||
-      !Array.isArray(review.pedagogyNotes) ||
-      !Array.isArray(review.traditionReviewNotes) ||
-      !Array.isArray(review.educatorReviewNotes)
-    ) {
-      return fail("lesson_agent_review_schema", "Expected all agentReview note groups to be arrays.");
     }
     if (review.revisionRequired && !listHasText(review.revisionRequests)) {
       return fail("lesson_agent_review_schema", "Expected revisionRequests when revisionRequired is true.");
@@ -298,6 +339,113 @@ const productChecks = {
       return fail("interview_extraction_guardrails", "Found overconfident or flattening doctrinal language.");
     }
     return fail("interview_extraction_guardrails", "Expected educator-review language, Buddhist context, and cautious handling of unclear points.");
+  },
+
+  brief_pedagogy_signal(output) {
+    const review = agentReviewOf(output);
+    const briefText = textOf([
+      output.briefSummary,
+      output.studentTakeaway,
+      output.keyChoices,
+      output.suggestedStructure,
+      output.reviewPrompts,
+      output.rehearsalFocus,
+      review?.pedagogyNotes,
+      review?.educatorReviewNotes
+    ]);
+    const hasPedagogyLanguage = hasAny(briefText, [
+      "scaffold",
+      "guided",
+      "model",
+      "practice",
+      "checkpoint",
+      "timebox",
+      "debrief",
+      "self-directed",
+      "small class",
+      "role-play",
+      "cards"
+    ]);
+    const hasReviewablePlanning =
+      listHasText(output.clarifyingQuestions) &&
+      listHasText(output.keyChoices) &&
+      listHasText(output.suggestedStructure) &&
+      listHasText(output.reviewPrompts);
+    if (hasReviewablePlanning && hasPedagogyLanguage) {
+      return pass("brief_pedagogy_signal", "Brief and review show scaffolded, practical planning signals.");
+    }
+    return fail("brief_pedagogy_signal", "Expected brief to show scaffolded, practical planning choices.");
+  },
+
+  brief_tradition_signal(output) {
+    const review = agentReviewOf(output);
+    const traditionText = textOf([
+      output.briefSummary,
+      output.studentTakeaway,
+      output.keyChoices,
+      output.reviewPrompts,
+      review?.traditionReviewNotes,
+      review?.educatorReviewNotes
+    ]);
+    const hasSpecificContext = hasAny(traditionText, [
+      "chinese mahayana",
+      "folk buddh",
+      "guanyin",
+      "ksitigarbha",
+      "bodhisattva",
+      "merit",
+      "temple",
+      "family practice"
+    ]);
+    const hasCaution = hasAny(traditionText, [
+      "educator review",
+      "review",
+      "temple",
+      "careful",
+      "avoid",
+      "not all buddhist",
+      "doctrinal",
+      "tradition",
+      "context"
+    ]);
+    const overconfident = hasAny(traditionText, [
+      "all buddhists believe",
+      "buddhism teaches that everyone must",
+      "this proves",
+      "guarantees enlightenment",
+      "always creates merit",
+      "karma means bad things happen because"
+    ]);
+    if (hasSpecificContext && hasCaution && !overconfident) {
+      return pass("brief_tradition_signal", "Brief and review preserve specific tradition context with cautious framing.");
+    }
+    if (overconfident) {
+      return fail("brief_tradition_signal", "Found overconfident or flattening doctrinal language.");
+    }
+    return fail("brief_tradition_signal", "Expected specific Chinese Mahayana folk Buddhist context plus cautious review language.");
+  },
+
+  brief_revision_trace(output) {
+    const review = agentReviewOf(output);
+    if (!review) return fail("brief_revision_trace", "Expected agentReview to trace the brief review pass.");
+    const briefText = textOf([output.reviewPrompts, output.keyChoices, output.suggestedStructure, output.changeLog]);
+    const noteGroups = [
+      ...(review.pedagogyNotes || []),
+      ...(review.traditionReviewNotes || []),
+      ...(review.educatorReviewNotes || []),
+      ...(review.revisionRequests || [])
+    ].filter((note) => typeof note === "string" && note.trim().length > 0);
+    const carriedNote = noteGroups.some((note) => {
+      const words = note
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((word) => word.length >= 6);
+      return words.some((word) => briefText.includes(word));
+    });
+    if (carriedNote || (!review.revisionRequired && noteGroups.length > 0 && hasAny(briefText, ["review", "educator", "tradition", "scaffold"]))) {
+      return pass("brief_revision_trace", "Brief review is visible and traceable in final brief planning notes.");
+    }
+    return fail("brief_revision_trace", "Expected final brief fields to carry through the critic review concerns.");
   },
 
   options_pedagogy_signal(output) {
