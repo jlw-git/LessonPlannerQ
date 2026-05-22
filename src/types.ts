@@ -58,6 +58,15 @@ export type LessonBrief = {
   reviewPrompts: string[];
 };
 
+export type InterviewExtraction = {
+  topic: string;
+  lessonObjectives: string;
+  planningRequirements: string;
+  openQuestions: string[];
+  confidenceNotes: string[];
+  sourceSummary: string;
+};
+
 export type LessonOption = {
   title: string;
   approach: string;

@@ -32,6 +32,7 @@ The current teaching context assumes:
 - Generate a lesson image from the visual pack prompt.
 - Generate rehearsal coaching for difficult student questions and simpler educator language.
 - Start a Realtime voice planning session through an ephemeral client secret, using audio-only browser microphone permission.
+- Extract voice interview transcripts into editable planning fields for educator review before generating options or briefs.
 - Save after-class lesson reflections in browser local storage and include recent reflections as planning memory for future outputs.
 - Run local evals against the real Express API routes to check schema contracts and product guardrails.
 
@@ -65,6 +66,7 @@ LLM-backed behavior:
 
 - `/api/options` asks the text model to generate exactly three comparable lesson approaches.
 - `/api/options` then runs a structured option review over the draft options and performs one revision pass when the critic requests changes.
+- `/api/interview/extract` asks the text model to convert a voice transcript into editable `topic`, `lessonObjectives`, and `planningRequirements` fields plus review notes.
 - `/api/brief` and `/api/brief/update` ask the text model to draft or revise structured lesson briefs.
 - `/api/lesson` asks the text model to draft the full 90-minute lesson plan.
 - `/api/lesson` then runs a structured agent review over the draft plan and performs one revision pass when the critic requests changes.
@@ -76,6 +78,7 @@ LLM-backed behavior:
 Rules-based and deterministic behavior:
 
 - The React app owns the planning workflow, button availability, selected option state, loading states, and rendering of typed artifacts.
+- The React app keeps extracted voice interview fields in an educator-review card and applies them to the form only when the educator chooses.
 - Form defaults, request payload assembly, and the inclusion of up to five recent reflections in generation requests are handled in `src/App.tsx`.
 - Reflection memory is local browser state: reflections are saved to `localStorage`, capped at 20, and can be edited or deleted without an LLM call.
 - The Express server owns route boundaries, model selection from environment variables, strict JSON schema contracts, prompt-cache keys, health responses, and API error handling.
@@ -88,11 +91,12 @@ Rules-based and deterministic behavior:
 The main planning flow starts in `src/App.tsx`. The frontend is organized as a planning cockpit: a persistent workflow rail, a central planning workspace, and a compact context panel for lesson memory, rehearsal, and next actions.
 
 1. The educator enters a topic, objectives, and planning requirements, or starts a realtime voice planning session.
-2. The frontend builds a request payload containing the form state, the selected lesson option when present, and up to five recent saved lesson reflections.
-3. The frontend calls the Express API routes under `/api`.
-4. The server sends stable product instructions plus task-specific instructions to OpenAI.
-5. Text routes request strict JSON schema output so the frontend can render typed lesson artifacts.
-6. The educator can compare options, refine a brief, generate a full plan, create visuals, rehearse explanations, and save reflections after the lesson.
+2. If the educator uses voice, the transcript can be extracted into editable planning fields and applied only after educator review.
+3. The frontend builds a request payload containing the form state, the selected lesson option when present, and up to five recent saved lesson reflections.
+4. The frontend calls the Express API routes under `/api`.
+5. The server sends stable product instructions plus task-specific instructions to OpenAI.
+6. Text routes request strict JSON schema output so the frontend can render typed lesson artifacts.
+7. The educator can compare options, refine a brief, generate a full plan, create visuals, rehearse explanations, and save reflections after the lesson.
 
 Saved reflections are stored in browser `localStorage` under `lesson-planner-q-reflections`. The app keeps up to 20 saved reflections and sends the five most recent into future planning requests as classroom evidence.
 
@@ -147,6 +151,7 @@ Agent roles:
 
 - `GET /api/health`: returns API health, model names, key presence, and prompt-cache configuration.
 - `POST /api/options`: generates three lesson-planning options, then runs critic/tradition review and one revision pass before returning the options plus `optionReview`.
+- `POST /api/interview/extract`: extracts voice transcript notes into editable planning fields plus open questions, confidence notes, and a source summary.
 - `POST /api/brief`: generates the initial lesson brief.
 - `POST /api/brief/update`: updates an existing brief using educator feedback.
 - `POST /api/lesson`: generates the full lesson plan, then runs critic/tradition review and one revision pass before returning the plan plus `agentReview`.

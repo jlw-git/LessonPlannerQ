@@ -166,6 +166,27 @@ const schemaChecks = {
       return fail("rehearsal_schema", "Expected at least 2 student questions.");
     }
     return pass("rehearsal_schema", "Rehearsal output includes the expected top-level contract.");
+  },
+
+  interview_extraction_schema(output) {
+    const required = ["topic", "lessonObjectives", "planningRequirements", "openQuestions", "confidenceNotes", "sourceSummary"];
+    if (!hasAllKeys(output, required)) {
+      return fail("interview_extraction_schema", "Interview extraction is missing one or more required fields.");
+    }
+    if (
+      typeof output.topic !== "string" ||
+      typeof output.lessonObjectives !== "string" ||
+      typeof output.planningRequirements !== "string" ||
+      typeof output.sourceSummary !== "string" ||
+      !Array.isArray(output.openQuestions) ||
+      !Array.isArray(output.confidenceNotes)
+    ) {
+      return fail("interview_extraction_schema", "Interview extraction fields have unexpected types.");
+    }
+    if (!output.topic.trim() || !output.lessonObjectives.trim() || !output.planningRequirements.trim()) {
+      return fail("interview_extraction_schema", "Expected extracted topic, objectives, and planning requirements to contain text.");
+    }
+    return pass("interview_extraction_schema", "Interview extraction includes editable planning fields and review notes.");
   }
 };
 
@@ -252,6 +273,31 @@ const productChecks = {
       return pass("sensitive_review", "Output handles sensitive doctrinal framing cautiously.");
     }
     return fail("sensitive_review", "Expected cautious handling of sensitive doctrinal framing.");
+  },
+
+  interview_extraction_guardrails(output) {
+    const text = textOf(output);
+    const hasContext = hasAny(text, ["chinese mahayana", "mahayana", "folk buddh", "guanyin", "temple", "merit"]);
+    const hasEducatorReview = hasAny(text, ["draft", "review", "educator", "open question", "unclear", "confirm"]);
+    const hasCaution =
+      hasAny(text, ["unclear", "confirm", "review", "careful", "not a simple", "avoid", "sensitive", "question"]) ||
+      listHasText(output.openQuestions) ||
+      listHasText(output.confidenceNotes);
+    const overconfident = hasAny(text, [
+      "all buddhists believe",
+      "buddhism teaches that everyone must",
+      "this proves",
+      "guarantees enlightenment",
+      "always creates merit",
+      "karma means bad things happen because"
+    ]);
+    if (hasContext && hasEducatorReview && hasCaution && !overconfident) {
+      return pass("interview_extraction_guardrails", "Extraction preserves context and keeps unclear points reviewable.");
+    }
+    if (overconfident) {
+      return fail("interview_extraction_guardrails", "Found overconfident or flattening doctrinal language.");
+    }
+    return fail("interview_extraction_guardrails", "Expected educator-review language, Buddhist context, and cautious handling of unclear points.");
   },
 
   options_pedagogy_signal(output) {

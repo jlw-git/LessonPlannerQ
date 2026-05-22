@@ -212,6 +212,27 @@ const briefSchema = {
   ]
 };
 
+const interviewExtractionSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    topic: { type: "string" },
+    lessonObjectives: { type: "string" },
+    planningRequirements: { type: "string" },
+    openQuestions: { type: "array", items: { type: "string" } },
+    confidenceNotes: { type: "array", items: { type: "string" } },
+    sourceSummary: { type: "string" }
+  },
+  required: [
+    "topic",
+    "lessonObjectives",
+    "planningRequirements",
+    "openQuestions",
+    "confidenceNotes",
+    "sourceSummary"
+  ]
+};
+
 const lessonOptionsSchema = {
   type: "object",
   additionalProperties: false,
@@ -481,6 +502,25 @@ Recommend whether a visual pack and rehearsal coach should be used next.`,
       input: req.body
     });
     res.json(brief);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/interview/extract", async (req, res, next) => {
+  try {
+    const extraction = await createJson({
+      schema: interviewExtractionSchema,
+      schemaName: "interview_extraction",
+      instructions: `Extract editable planning fields from the educator's voice interview transcript.
+Return only draft fields for educator review; do not generate a lesson plan, choose an option, or imply the extraction is authoritative.
+Use currentForm as fallback context when the transcript is incomplete, but prioritize explicit educator statements in transcriptEntries.
+Preserve the Chinese Mahayana folk Buddhist teaching context when relevant instead of flattening the lesson into generic Buddhism.
+If a transcript point is unclear, contradictory, missing, or doctrinally sensitive, put a concise item in openQuestions or confidenceNotes rather than guessing.
+Avoid absolute claims about karma, merit, enlightenment, or what all Buddhists believe. Use cautious educator-review language.`,
+      input: req.body
+    });
+    res.json(sanitizeRiskyDoctrineLanguage(extraction));
   } catch (error) {
     next(error);
   }

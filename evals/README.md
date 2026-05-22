@@ -36,6 +36,7 @@ The runner requires `OPENAI_API_KEY` when it starts the API itself. Results are 
 - Reflection memory: lesson plans should visibly use prior classroom evidence when provided.
 - Visual review: visual packs should include culturally careful review notes, especially around sacred figures.
 - Rehearsal coaching: difficult questions should receive simple, respectful educator-facing responses.
+- Interview extraction: voice transcripts should become editable planning fields with educator-review notes before generation.
 - Option agent review: option sets should return structured `optionReview` notes with pedagogy and tradition-review signals.
 - Adversarial option requests: `/api/options` should repair weak scaffolding, resist generic Buddhist framing, and flag overconfident doctrinal claims for educator or temple review.
 - Lesson agent review: full plans should return structured `agentReview` notes with pedagogy and tradition-review signals.

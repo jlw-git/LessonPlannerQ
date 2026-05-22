@@ -460,6 +460,18 @@ h3 {
   text-transform: uppercase;
 }
 
+.transcript-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.compact-button {
+  min-height: 34px;
+  padding: 8px 10px;
+}
+
 .transcript-log {
   display: grid;
   gap: 8px;
@@ -487,6 +499,64 @@ h3 {
 
 .transcript-log article.planner strong {
   color: #24584f;
+}
+
+.interview-ready-card,
+.interview-review-card {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.interview-ready-card {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.interview-ready-card h2,
+.interview-review-card h2 {
+  font-size: clamp(1.1rem, 1.8vw, 1.45rem);
+  margin-bottom: 4px;
+}
+
+.interview-ready-card p,
+.interview-review-card p {
+  color: #617066;
+  margin-bottom: 0;
+}
+
+.interview-review-card {
+  background: #fffaf0;
+  border: 1px solid rgba(180, 83, 9, 0.22);
+  border-radius: 8px;
+}
+
+.interview-review-head {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.interview-review-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.interview-review-grid > div {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(180, 83, 9, 0.16);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.interview-review-grid strong {
+  color: #7c2d12;
+  font-size: 0.72rem;
+  font-weight: 840;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 
@@ -3393,6 +3463,8 @@ label textarea {
   .option-picker,
   .option-detail-grid,
   .option-expanded .option-detail-grid,
+  .interview-ready-card,
+  .interview-review-grid,
   .two-col,
   .recommendation-grid,
   .lesson-overview,

@@ -22,6 +22,7 @@ import {
   Wand2
 } from "lucide-react";
 import type {
+  InterviewExtraction,
   LessonAgentReview,
   LessonBrief,
   LessonOption,
@@ -224,6 +225,63 @@ function OptionAgentReviewPanel({ review }: { review: OptionAgentReview }) {
   );
 }
 
+function InterviewExtractionReview({
+  draft,
+  onUpdate,
+  onApply,
+  onDismiss
+}: {
+  draft: InterviewExtraction;
+  onUpdate: (field: "topic" | "lessonObjectives" | "planningRequirements", value: string) => void;
+  onApply: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <section className="interview-review-card" aria-label="Review extracted interview notes">
+      <div className="interview-review-head">
+        <div>
+          <span className="section-eyebrow">Interview notes</span>
+          <h2>Review extracted planning fields</h2>
+        </div>
+        <button className="icon-button" onClick={onDismiss} aria-label="Dismiss interview extraction">
+          <X size={18} />
+        </button>
+      </div>
+      <p>{draft.sourceSummary}</p>
+      <label>
+        Topic
+        <input value={draft.topic} onChange={(event) => onUpdate("topic", event.target.value)} />
+      </label>
+      <label>
+        <Target size={16} />
+        Lesson objectives
+        <textarea value={draft.lessonObjectives} onChange={(event) => onUpdate("lessonObjectives", event.target.value)} rows={3} />
+      </label>
+      <label>
+        <MessageCircle size={16} />
+        Planning requirements
+        <textarea value={draft.planningRequirements} onChange={(event) => onUpdate("planningRequirements", event.target.value)} rows={4} />
+      </label>
+      <div className="interview-review-grid">
+        <div>
+          <strong>Open questions</strong>
+          <List items={draft.openQuestions.length > 0 ? draft.openQuestions : ["No open questions extracted."]} />
+        </div>
+        <div>
+          <strong>Confidence notes</strong>
+          <List items={draft.confidenceNotes.length > 0 ? draft.confidenceNotes : ["No additional confidence notes."]} />
+        </div>
+      </div>
+      <div className="typed-actions">
+        <button onClick={onApply} className="primary">
+          <CheckCircle2 size={18} />
+          Apply to typed brief
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function Section({
   title,
   icon,
@@ -327,6 +385,8 @@ export default function App() {
   const [editingReflectionId, setEditingReflectionId] = useState<string | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"idle" | "connecting" | "live">("idle");
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [interviewDraft, setInterviewDraft] = useState<InterviewExtraction | null>(null);
+  const [interviewApplied, setInterviewApplied] = useState(false);
   const realtimePeer = useRef<RTCPeerConnection | null>(null);
   const realtimeStream = useRef<MediaStream | null>(null);
   const realtimeAudio = useRef<HTMLAudioElement | null>(null);
@@ -431,6 +491,23 @@ export default function App() {
 
   const update = (field: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateInterviewDraft = (field: "topic" | "lessonObjectives" | "planningRequirements", value: string) => {
+    setInterviewDraft((current) => (current ? { ...current, [field]: value } : current));
+  };
+
+  const clearGeneratedArtifacts = () => {
+    setLessonOptions([]);
+    setOptionReview(null);
+    setSelectedOptionIndex(null);
+    setExpandedOptionIndex(null);
+    setBrief(null);
+    setLesson(null);
+    setVisuals(null);
+    setRehearsal(null);
+    setGeneratedImage(null);
+    setFeedback("");
   };
 
   const updateReflectionDraft = (field: keyof ReflectionDraft, value: string) => {
@@ -550,6 +627,52 @@ export default function App() {
       setLessonOptions(result.options);
       setOptionReview(result.optionReview ?? null);
     });
+  };
+
+  const educatorTranscriptEntries = useMemo(
+    () =>
+      transcript.filter((entry) => {
+        const text = entry.text.trim();
+        return entry.role === "educator" && text.length > 0 && !text.startsWith("Start a voice lesson planning interview");
+      }),
+    [transcript]
+  );
+  const hasEducatorTranscript = educatorTranscriptEntries.length > 0;
+
+  const extractInterviewNotes = () => {
+    if (!hasEducatorTranscript) return;
+
+    return run(
+      "interview-extract",
+      () =>
+        postJson<InterviewExtraction>("/api/interview/extract", {
+          transcriptEntries: transcript
+            .map((entry) => ({ role: entry.role, text: entry.text.trim() }))
+            .filter((entry) => entry.text.length > 0),
+          currentForm: form,
+          lessonMemory: requestPayload.lessonMemory,
+          tradition: requestPayload.tradition,
+          studentAge: requestPayload.studentAge,
+          classSize: requestPayload.classSize,
+          duration: requestPayload.duration,
+          safety: requestPayload.safety
+        }),
+      setInterviewDraft
+    );
+  };
+
+  const applyInterviewDraft = () => {
+    if (!interviewDraft) return;
+
+    setForm({
+      topic: interviewDraft.topic,
+      lessonObjectives: interviewDraft.lessonObjectives,
+      planningRequirements: interviewDraft.planningRequirements
+    });
+    clearGeneratedArtifacts();
+    setInterviewDraft(null);
+    setInterviewApplied(true);
+    outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const selectOption = (index: number) => {
@@ -707,6 +830,8 @@ export default function App() {
     setVoiceSignal("connecting");
     setError(null);
     setTranscript([]);
+    setInterviewDraft(null);
+    setInterviewApplied(false);
     addTranscript({
       role: "planner",
       text: "Starting voice planning. Allow microphone access if your browser asks."
@@ -963,7 +1088,15 @@ export default function App() {
               </button>
             </div>
             <aside className="transcript-drawer">
-              <h2>Transcript</h2>
+              <div className="transcript-head">
+                <h2>Transcript</h2>
+                {hasEducatorTranscript && (
+                  <button onClick={extractInterviewNotes} disabled={Boolean(loading)} className="quiet-button compact-button">
+                    {loading === "interview-extract" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
+                    Use interview notes
+                  </button>
+                )}
+              </div>
               <div className="transcript-log" ref={transcriptRef}>
                 {transcript.map((entry) => (
                   <article className={entry.role} key={entry.id}>
@@ -977,7 +1110,37 @@ export default function App() {
         )}
 
         <div className="content" ref={outputRef}>
-          {!loading && lessonOptions.length === 0 && !brief && !lesson && !rehearsal && (
+          {realtimeStatus === "idle" && transcript.length > 0 && !interviewApplied && (
+            <section className="inline-draft interview-ready-card">
+              <div>
+                <span className="section-eyebrow">Voice interview</span>
+                <h2>Interview transcript is ready</h2>
+                <p>Extract editable planning fields from the transcript, then review them before generating lesson options.</p>
+              </div>
+              <button onClick={extractInterviewNotes} disabled={Boolean(loading) || !hasEducatorTranscript} className="primary">
+                {loading === "interview-extract" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+                Use interview notes
+              </button>
+            </section>
+          )}
+
+          {interviewDraft && (
+            <InterviewExtractionReview
+              draft={interviewDraft}
+              onUpdate={updateInterviewDraft}
+              onApply={applyInterviewDraft}
+              onDismiss={() => setInterviewDraft(null)}
+            />
+          )}
+
+          {loading === "interview-extract" && (
+            <LoadingState
+              title="Extracting interview notes"
+              description="Turning the voice transcript into editable planning fields for educator review."
+            />
+          )}
+
+          {!loading && transcript.length === 0 && !interviewDraft && lessonOptions.length === 0 && !brief && !lesson && !rehearsal && (
             <section className="empty-state guided-empty">
               <FileText size={28} />
               <h2>Your planning path will appear here</h2>
