@@ -3594,6 +3594,23 @@ label textarea {
   justify-items: end;
 }
 
+.transcript-log article.live-caption p {
+  box-shadow: 0 0 0 2px rgba(28, 110, 84, 0.08);
+}
+
+.transcript-log article.live-caption p::after {
+  animation: caption-pulse 1s ease-in-out infinite;
+  content: "";
+  display: inline-block;
+  background: currentColor;
+  border-radius: 999px;
+  height: 0.35em;
+  margin-left: 0.35em;
+  opacity: 0.42;
+  vertical-align: middle;
+  width: 0.35em;
+}
+
 .transcript-log strong {
   color: var(--muted);
   font-size: 0.72rem;
@@ -3637,6 +3654,19 @@ label textarea {
 .transcript-head h2 {
   color: var(--ink);
   font-size: 0.82rem;
+}
+
+@keyframes caption-pulse {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 0.66;
+    transform: scale(1.12);
+  }
 }
 
 .generated-image img {

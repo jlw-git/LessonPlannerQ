@@ -31,7 +31,7 @@ The current teaching context assumes:
 - Generate a visual material pack with image prompt, story cards, scenario cards, value cards, storyboard panels, worksheet prompts, and review notes.
 - Generate a lesson image from the visual pack prompt.
 - Generate rehearsal coaching for difficult student questions and simpler educator language.
-- Start a Realtime voice planning session through an ephemeral client secret, using audio-only browser microphone permission.
+- Start a Realtime voice planning session through an ephemeral client secret, using audio-only browser microphone permission and live captions for both PlannerQ speech and educator microphone input.
 - Extract voice interview transcripts into editable planning fields for educator review before generating options or briefs.
 - Save after-class lesson reflections in browser local storage and include recent reflections as planning memory for future outputs.
 - Run local evals against the real Express API routes to check schema contracts and product guardrails.
@@ -92,7 +92,7 @@ The main planning flow starts in `src/App.tsx`. The frontend is organized as a s
 
 1. The educator enters a topic, objectives, and planning requirements, or starts a realtime voice planning session.
 2. The initial screen presents voice planning as the primary path for thinking aloud with PlannerQ, while the typed brief stays available as a secondary fallback.
-3. If the educator uses voice, the transcript can be extracted into editable planning fields and applied only after educator review.
+3. If the educator uses voice, live captions appear during the conversation, then the transcript can be extracted into editable planning fields and applied only after educator review.
 4. The frontend builds a request payload containing the form state, the selected lesson option when present, and up to five recent saved lesson reflections.
 5. The frontend calls the Express API routes under `/api`.
 6. The server sends stable product instructions plus task-specific instructions to OpenAI.
