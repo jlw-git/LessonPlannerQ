@@ -46,6 +46,7 @@ type TranscriptEntry = {
   id: string;
   role: "educator" | "planner";
   text: string;
+  status: "partial" | "final";
 };
 
 type VoiceSignal = "idle" | "connecting" | "listening" | "speaking" | "permission-error" | "api-error";
@@ -70,6 +71,7 @@ type LessonReflection = {
 type ReflectionDraft = Omit<LessonReflection, "id">;
 
 const reflectionStorageKey = "lesson-planner-q-reflections";
+const voiceStarterItemId = "plannerq-voice-starter";
 
 const initialForm: FormState = {
   topic: "",
@@ -786,22 +788,17 @@ export default function App() {
     });
   };
 
-  const addTranscript = (entry: Omit<TranscriptEntry, "id">) => {
-    setTranscript((current) => [
-      ...current,
-      {
-        ...entry,
-        id: `${Date.now()}-${current.length}`
-      }
-    ]);
-    window.setTimeout(() => transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }), 0);
-  };
-
-  const upsertTranscript = (id: string, role: TranscriptEntry["role"], text: string, mode: "append" | "replace") => {
+  const upsertTranscript = (
+    id: string,
+    role: TranscriptEntry["role"],
+    text: string,
+    mode: "append" | "replace",
+    status: TranscriptEntry["status"]
+  ) => {
     setTranscript((current) => {
       const existingIndex = current.findIndex((entry) => entry.id === id);
       if (existingIndex === -1) {
-        return [...current, { id, role, text }];
+        return [...current, { id, role, text, status }];
       }
 
       const next = [...current];
@@ -809,7 +806,8 @@ export default function App() {
       next[existingIndex] = {
         ...existing,
         role,
-        text: mode === "append" ? `${existing.text}${text}` : text
+        text: mode === "append" ? `${existing.text}${text}` : text,
+        status
       };
       return next;
     });
@@ -821,20 +819,28 @@ export default function App() {
       const data = JSON.parse(event.data);
       const type = data.type || "";
 
-      if (type === "response.audio_transcript.delta" || type === "response.output_text.delta") {
+      if (
+        type === "response.output_audio_transcript.delta" ||
+        type === "response.audio_transcript.delta" ||
+        type === "response.output_text.delta"
+      ) {
         setVoiceSignal("speaking");
         const id = data.item_id || data.response_id || "planner-live";
         if (typeof data.delta === "string") {
-          upsertTranscript(id, "planner", data.delta, "append");
+          upsertTranscript(id, "planner", data.delta, "append", "partial");
         }
         return;
       }
 
-      if (type === "response.audio_transcript.done" || type === "response.output_text.done") {
+      if (
+        type === "response.output_audio_transcript.done" ||
+        type === "response.audio_transcript.done" ||
+        type === "response.output_text.done"
+      ) {
         setVoiceSignal("listening");
         const id = data.item_id || data.response_id || "planner-live";
         if (typeof data.transcript === "string" || typeof data.text === "string") {
-          upsertTranscript(id, "planner", data.transcript || data.text, "replace");
+          upsertTranscript(id, "planner", data.transcript || data.text, "replace", "final");
         }
         return;
       }
@@ -843,7 +849,7 @@ export default function App() {
         setVoiceSignal("listening");
         const id = data.item_id || `educator-${Date.now()}`;
         if (typeof data.transcript === "string") {
-          upsertTranscript(id, "educator", data.transcript, "replace");
+          upsertTranscript(id, "educator", data.transcript, "replace", "final");
         }
         return;
       }
@@ -852,18 +858,24 @@ export default function App() {
         setVoiceSignal("listening");
         const id = data.item_id || "educator-live";
         if (typeof data.delta === "string") {
-          upsertTranscript(id, "educator", data.delta, "append");
+          upsertTranscript(id, "educator", data.delta, "append", "partial");
         }
         return;
       }
 
       if (type === "conversation.item.created") {
+        if (data.item?.id === voiceStarterItemId) {
+          return;
+        }
         const role = data.item?.role === "user" ? "educator" : "planner";
         const content = data.item?.content?.find((part: { transcript?: string; text?: string }) => part.transcript || part.text);
         const text = content?.transcript || content?.text;
+        if (role === "educator" && typeof text === "string" && text.startsWith("Start a voice lesson planning interview")) {
+          return;
+        }
         const id = data.item?.id || `${role}-${Date.now()}`;
         if (typeof text === "string") {
-          upsertTranscript(id, role, text, "replace");
+          upsertTranscript(id, role, text, "replace", "final");
         }
       }
     } catch {
@@ -936,6 +948,7 @@ export default function App() {
           JSON.stringify({
             type: "conversation.item.create",
             item: {
+              id: voiceStarterItemId,
               type: "message",
               role: "user",
               content: [
@@ -1112,7 +1125,7 @@ export default function App() {
 
               <aside className="transcript-drawer">
                 <div className="transcript-head">
-                  <h2>Conversation</h2>
+                  <h2>Live captions</h2>
                   {hasEducatorTranscript && (
                     <button onClick={extractInterviewNotes} disabled={Boolean(loading)} className="quiet-button compact-button">
                       {loading === "interview-extract" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
@@ -1120,14 +1133,14 @@ export default function App() {
                     </button>
                   )}
                 </div>
-                <div className="transcript-log" ref={transcriptRef}>
+                <div className="transcript-log" ref={transcriptRef} aria-live="polite" aria-relevant="additions text">
                   {transcript.length === 0 ? (
                     <p className="conversation-empty">
-                      The dialogue will appear here as PlannerQ speaks and your microphone input is transcribed.
+                      Captions will appear here as PlannerQ speaks and your microphone input is transcribed.
                     </p>
                   ) : (
                     transcript.map((entry) => (
-                      <article className={entry.role} key={entry.id}>
+                      <article className={`${entry.role} ${entry.status === "partial" ? "live-caption" : ""}`} key={entry.id}>
                         <strong>{entry.role === "educator" ? "You" : "PlannerQ"}</strong>
                         <p>{entry.text}</p>
                       </article>
