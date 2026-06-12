@@ -6,7 +6,7 @@ This is a living project document. Update it whenever the product's behavior, st
 
 Lesson Planner Q is an AI-powered lesson preparation studio for Chinese Mahayana folk Buddhist educators teaching small 90-minute classes of 13-year-old students.
 
-The product helps an educator move from a rough topic or voice planning conversation into lesson options, an educator-reviewed brief, a full lesson plan, printable visual material ideas, rehearsal coaching, and after-class reflection memory.
+The product helps an educator move from a rough topic or voice planning conversation into lesson options, an educator-reviewed lesson outline, a full lesson plan, printable visual material ideas, practice coaching, and after-class reflection memory.
 
 ## Who It Is For
 
@@ -24,16 +24,23 @@ The current teaching context assumes:
 
 - Generate three distinct lesson-planning options before committing to a plan.
 - Review generated lesson options with a pedagogy critic and tradition reviewer, revise once when needed, and show a concise educator-facing option review.
-- Generate a concise lesson brief with clarifying questions and planning choices, then review and revise it once when needed.
-- Update the brief from educator feedback, then review and revise the update once when needed.
+- Generate a concise educator-facing lesson outline with planning choices, then review and revise it once when needed. Internally this still uses the `LessonBrief` type and `/api/brief` route.
+- Update the lesson outline from educator feedback, then review and revise the update once when needed.
 - Generate a full lesson plan with objectives, lesson flow, play-based activity, gradual-release self-directed learning, reflection prompts, and educator notes.
 - Review generated full lesson plans with a pedagogy critic and tradition reviewer, revise once when needed, and show educator-facing review notes.
 - Generate a visual material pack with image prompt, story cards, scenario cards, value cards, storyboard panels, worksheet prompts, and review notes.
 - Generate a lesson image from the visual pack prompt.
+- Print or save lesson plan drafts and visual packs as PDFs through the browser print dialog.
 - Generate rehearsal coaching for difficult student questions and simpler educator language.
+- Critique typed educator practice attempts for clarity, tone, age fit, and tradition fit.
 - Start a Realtime voice planning session through an ephemeral client secret, using audio-only browser microphone permission and live captions for both PlannerQ speech and educator microphone input.
-- Extract voice interview transcripts into editable planning fields for educator review before generating options or briefs.
+- Review the latest voice transcript after ending the voice session, with a copy action for source-note audit.
+- Extract voice transcripts into editable lesson requirements for educator review and explicit approval before generating options or lesson outlines.
+- Keep Realtime voice planning from advancing by itself: the app disables automatic Realtime responses from VAD, manually creates a PlannerQ response only after a meaningful educator transcript, and uses browser echo cancellation plus Realtime input noise reduction to reduce self-triggered turns.
 - Save after-class lesson reflections in browser local storage and include recent reflections as planning memory for future outputs.
+- Synthesize saved reflections into inspectable classroom evidence while preserving raw reflections as the source of truth.
+- Track local-only planning metrics in browser storage, including generation, rehearsal, reflection, and print events.
+- Use a small local reference-notes layer as internal planning guardrails for Chinese Mahayana folk Buddhist specificity and practical pedagogy.
 - Run local evals against the real Express API routes to check schema contracts and product guardrails.
 
 ## How It Is Built
@@ -72,15 +79,20 @@ LLM-backed behavior:
 - `/api/lesson` then runs a structured agent review over the draft plan and performs one revision pass when the critic requests changes.
 - `/api/visuals` asks the text model to draft printable material guidance, story/scenario cards, worksheet prompts, storyboard panels, review notes, and the image prompt.
 - `/api/rehearsal` asks the text model to generate likely student questions, simpler language, suggested responses, and coaching notes.
+- `/api/rehearsal/critique` asks the text model to critique a typed educator rehearsal attempt.
+- `/api/reflections/synthesize` asks the text model to synthesize raw local reflections into inspectable classroom evidence.
 - `/api/image` uses the image model to render one lesson visual from the visual pack prompt.
-- `/api/realtime/client-secret` creates a Realtime session for educator-facing voice planning or rehearsal.
+- `/api/realtime/client-secret` creates a Realtime session for educator-facing voice planning only. The Realtime planner gathers context with concise questions and does not draft lesson options, briefs, full lesson plans, visuals, or materials inside the conversation. Realtime VAD is used for speech segmentation and transcription, but automatic model responses are disabled; the React client decides when to send `response.create`.
 
 Rules-based and deterministic behavior:
 
-- The React app owns the planning workflow, button availability, selected option state, loading states, and rendering of typed artifacts.
-- The React app keeps extracted voice interview fields in an educator-review card and applies them to the form only when the educator chooses.
+- The React app owns the planning workflow, button availability, selected option state, loading states, approval gates, and rendering of typed artifacts.
+- The React app keeps extracted voice fields in an educator-review card and applies them to the form only when the educator explicitly approves the captured notes.
 - Form defaults, request payload assembly, and the inclusion of up to five recent reflections in generation requests are handled in `src/App.tsx`.
-- Reflection memory is local browser state: reflections are saved to `localStorage`, capped at 20, and can be edited or deleted without an LLM call.
+- The latest voice transcript is local browser state under `lesson-planner-q-last-voice-transcript`. It is available for review after the session ends, survives refresh, and is cleared when a new voice session starts.
+- Reflection memory is local browser state: reflections are saved to `localStorage`, capped at 20, and can be edited or deleted without an LLM call. Reflection synthesis is stored separately and marked stale when raw reflections change.
+- Metrics are local browser state only and are saved under `lesson-planner-q-metrics`; no external analytics or network telemetry is used.
+- Local reference notes are internal guardrails, not formal citations or temple authority.
 - The Express server owns route boundaries, model selection from environment variables, strict JSON schema contracts, prompt-cache keys, health responses, and API error handling.
 - JSON schemas constrain the shape of model responses, but the prose content inside those schemas is still model-generated and requires educator review.
 - The eval runner and graders are deterministic checks over route responses; they do not replace human review of religious, cultural, or classroom fit.
@@ -88,18 +100,20 @@ Rules-based and deterministic behavior:
 
 ## How It Works
 
-The main planning flow starts in `src/App.tsx`. The frontend is organized as a streamlined planning workspace: a voice-first start brief, a compact context panel for lesson memory, rehearsal, and next actions that appears once there is planning context or saved memory to act on, and a workflow rail that appears after a full lesson plan exists.
+The main planning flow starts in `src/App.tsx`. The frontend is organized as a streamlined educator-controlled planning workspace: a voice-first start card with a typed fallback, an explicit lesson-requirements review gate, and a main artifact workspace for options, lesson outlines, full lesson drafts, materials, practice, and reflection. The old right-side next-step panel was removed so the main workspace owns the current primary action.
 
 1. The educator enters a topic, objectives, and planning requirements, or starts a realtime voice planning session.
-2. The initial screen presents voice planning as the primary path for thinking aloud with PlannerQ, while the typed brief stays available as a secondary fallback.
-3. If the educator uses voice, live captions appear during the conversation, then the transcript can be extracted into editable planning fields and applied only after educator review.
-4. The frontend builds a request payload containing the form state, the selected lesson option when present, and up to five recent saved lesson reflections.
-5. The frontend calls the Express API routes under `/api`.
-6. The server sends stable product instructions plus task-specific instructions to OpenAI.
-7. Text routes request strict JSON schema output so the frontend can render typed lesson artifacts.
-8. The educator can compare options, refine a brief, generate a full plan, create visuals, rehearse explanations, and save reflections after the lesson.
+2. The initial screen presents voice as the primary path using simple action copy: "Talk about it." The secondary path is "Type it out." The start card should invite the educator to share the topic, objectives, student needs, timing, and constraints without explaining unnecessary system mechanics.
+3. If the educator uses voice, live captions appear during the conversation as source evidence only. Generated options, lesson outlines, lesson plans, visuals, and materials appear outside the dialogue.
+4. After the voice session ends, the latest transcript remains visible as source notes and can be copied. The transcript is also saved locally in the browser until the next voice session starts.
+5. The transcript can be extracted into editable lesson requirements. The educator can edit the fields and must approve the requirements before continuing.
+6. The frontend builds a request payload containing the approved or typed form state, the selected lesson option when present, and up to five recent saved lesson reflections.
+7. The frontend calls the Express API routes under `/api`.
+8. The server sends stable product instructions plus task-specific instructions to OpenAI.
+9. Text routes request strict JSON schema output so the frontend can render typed lesson artifacts.
+10. The educator can compare options, refine a lesson outline, generate a document-style full lesson draft with quality review, create materials, practice explanations, review a typed practice attempt, print/save artifacts as PDF through the browser print dialog, summarize classroom evidence, and save reflections after the lesson.
 
-Saved reflections are stored in browser `localStorage` under `lesson-planner-q-reflections`. The app keeps up to 20 saved reflections and sends the five most recent into future planning requests as classroom evidence.
+Saved reflections are stored in browser `localStorage` under `lesson-planner-q-reflections`. The app keeps up to 20 saved reflections and sends the five most recent into future planning requests as classroom evidence. Synthesized reflection memory is stored under `lesson-planner-q-reflection-synthesis`, and local metrics are stored under `lesson-planner-q-metrics`.
 
 ## Agentic Planning Loop
 
@@ -158,6 +172,8 @@ Agent roles:
 - `POST /api/lesson`: generates the full lesson plan, then runs critic/tradition review and one revision pass before returning the plan plus `agentReview`.
 - `POST /api/visuals`: generates the printable visual material pack.
 - `POST /api/rehearsal`: generates educator rehearsal coaching.
+- `POST /api/rehearsal/critique`: critiques a typed educator rehearsal attempt for clarity, tone, age fit, tradition caution, and suggested revision.
+- `POST /api/reflections/synthesize`: synthesizes saved reflections into inspectable classroom evidence for future planning.
 - `POST /api/image`: generates one image from a visual prompt.
 - `POST /api/realtime/client-secret`: creates a short-lived realtime client secret for voice planning.
 
@@ -180,21 +196,30 @@ The runner imports the Express app, starts it on an ephemeral local port, sends 
 - Scaffold self-directed learning with clear goals, choices, timeboxes, check-ins, and reflection.
 - Use lesson reflections as evidence from the actual classroom, not as decorative history.
 
+## UX And Copy Principles
+
+- Voice is primary; typing is secondary. The first screen should make talking feel like the natural way to start, with typing as a clear fallback.
+- Use plain educator-facing language. Prefer "Talk about it" and "Type it out" over formal terms like interview or internal terms like MVP, signals, guardrails, and critic.
+- Keep copy short but useful. The start screen should say what to provide: topic, objectives, student needs, timing, and constraints.
+- Do not explain PlannerQ mechanics unless the explanation affects the educator's next action. Avoid repeated process copy.
+- Reduce visible complexity. Hide workflow, metrics, reference notes, and extra panels until they are relevant to the current phase.
+- Professional design means calm hierarchy, one dominant action per phase, and visible elements that clearly help the educator act now.
+
 ## Next Build Priorities
 
 Current implementation priorities, in order:
 
-1. Polish the core weekly planning loop: voice or typed input, reviewed options, selected brief, rehearsal, full plan, visual/export, and reflection.
-2. Add editable and exportable lesson artifacts, starting with printable lesson plans and visual packs.
-3. Upgrade rehearsal from static coaching into a practice loop where the educator can try an explanation and receive feedback on clarity, tone, age fit, and doctrinal caution.
-4. Build reflection memory synthesis so saved reflections become inspectable classroom evidence, not only raw local notes passed into prompts.
-5. Add a small curated Buddhist and pedagogy reference layer to improve trust, source quality, and tradition-specific planning.
-6. Instrument MVP success metrics such as time to usable plan, option selection, brief refinement, rehearsal use, visual generation, reflection save rate, and repeat weekly use.
+1. Polish the core weekly planning loop with real-classroom testing: voice or typed input, reviewed options, selected lesson outline, practice, full plan, material export, and reflection.
+2. Add editable document exports such as DOCX after the browser print/PDF path is stable.
+3. Upgrade rehearsal critique from typed attempts into an optional voice practice loop.
+4. Expand reflection memory synthesis into a more editable, inspectable memory workspace.
+5. Replace internal reference notes with vetted Buddhist and pedagogy sources if formal citations are needed.
+6. Review local planning metrics for usefulness before considering any account-based or shared analytics.
 
 ## Known Gaps
 
 - Reflection memory is local to the browser, so it does not sync across devices.
-- Generated materials are not yet exported as printable PDFs or editable document files.
+- Generated materials can be printed or saved as PDFs through the browser print dialog, but there is no generated binary PDF or editable document export yet.
 - There is no user account system or persistent database.
 - There is a focused local eval harness, but no broader unit or browser test suite yet.
 - Cultural or doctrinal review still depends on educator judgment.

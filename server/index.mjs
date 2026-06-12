@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import dotenv from "dotenv";
 import express from "express";
 import OpenAI from "openai";
+import { referenceNotes, referenceNotesInstruction } from "./reference-notes.mjs";
 
 const root = process.cwd();
 for (const file of [".env.local", ".env_local", ".env"]) {
@@ -54,6 +55,7 @@ Stable product contract for every generated artifact:
 - If lessonMemory is provided, treat it as classroom evidence from past lessons. Consider the lesson plan that was actually used, build on what worked, adjust what did not work, and carry forward next-time notes into the new lesson design.
 - Use concise language by default. Favor specific classroom moves over long theory. Avoid generic moralizing, vague inspiration, or unsupported doctrinal claims.
 - If a question is culturally or doctrinally sensitive, flag it for educator review instead of overconfidently resolving it.
+- Use internal reference notes when provided as planning guardrails. Do not describe them as formal citations or temple authority.
 - Return only content that matches the requested JSON schema. Do not include markdown fences, commentary outside the JSON object, or fields not present in the schema.
 
 Prompt-cache note: this shared prefix is intentionally stable across text generation routes. Task-specific instructions and dynamic lesson context appear after this prefix.`;
@@ -320,6 +322,62 @@ const rehearsalSchema = {
   required: ["scenario", "studentQuestions", "suggestedResponses", "simplerLanguage", "coachingNotes"]
 };
 
+const rehearsalCritiqueSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    practicedQuestion: { type: "string" },
+    educatorAttempt: { type: "string" },
+    summary: { type: "string" },
+    strengths: { type: "array", items: { type: "string" } },
+    clarityNotes: { type: "array", items: { type: "string" } },
+    toneAndAgeFitNotes: { type: "array", items: { type: "string" } },
+    traditionCautionNotes: { type: "array", items: { type: "string" } },
+    suggestedRevision: { type: "string" },
+    nextPracticePrompt: { type: "string" },
+    briefFeedbackSuggestion: { type: "string" },
+    educatorReviewNotes: { type: "array", items: { type: "string" } }
+  },
+  required: [
+    "practicedQuestion",
+    "educatorAttempt",
+    "summary",
+    "strengths",
+    "clarityNotes",
+    "toneAndAgeFitNotes",
+    "traditionCautionNotes",
+    "suggestedRevision",
+    "nextPracticePrompt",
+    "briefFeedbackSuggestion",
+    "educatorReviewNotes"
+  ]
+};
+
+const reflectionSynthesisSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    summary: { type: "string" },
+    workedWellPatterns: { type: "array", items: { type: "string" } },
+    avoidOrAdjustPatterns: { type: "array", items: { type: "string" } },
+    studentResponseThemes: { type: "array", items: { type: "string" } },
+    nextTimeGuidance: { type: "array", items: { type: "string" } },
+    cautionNotes: { type: "array", items: { type: "string" } },
+    sourceReflectionIds: { type: "array", items: { type: "string" } },
+    generatedAt: { type: "string" }
+  },
+  required: [
+    "summary",
+    "workedWellPatterns",
+    "avoidOrAdjustPatterns",
+    "studentResponseThemes",
+    "nextTimeGuidance",
+    "cautionNotes",
+    "sourceReflectionIds",
+    "generatedAt"
+  ]
+};
+
 const lessonAgentReviewSchema = {
   type: "object",
   additionalProperties: false,
@@ -455,14 +513,15 @@ app.get("/api/health", (_req, res) => {
 
 app.post("/api/lesson", async (req, res, next) => {
   try {
-    const payload = req.body;
+    const payload = { ...req.body, referenceNotes };
     const draftLesson = await createJson({
       schema: lessonSchema,
       schemaName: "lesson_plan",
       instructions: `Generate one complete weekly lesson plan. Make it feasible for a small class and avoid generic moralizing.
 Product guardrails override planning requests that weaken scaffolding, flatten Buddhist traditions into generic Buddhism, or ask for overconfident doctrinal claims.
 Always include gradual release in selfDirectedLearning, and include at least two concrete checkpoints.
-When the educator request includes doctrinally risky wording, correct it with cautious age-appropriate language instead of repeating the risky claim verbatim.`,
+When the educator request includes doctrinally risky wording, correct it with cautious age-appropriate language instead of repeating the risky claim verbatim.
+${referenceNotesInstruction}`,
       input: payload
     });
 
@@ -501,7 +560,7 @@ Include concise reviewNotes that name remaining educator judgment calls.`,
 
 app.post("/api/brief", async (req, res, next) => {
   try {
-    const payload = req.body;
+    const payload = { ...req.body, referenceNotes };
     const draftBrief = await createJson({
       schema: briefSchema,
       schemaName: "lesson_brief",
@@ -509,7 +568,8 @@ app.post("/api/brief", async (req, res, next) => {
 Include clarifying questions the lesson planner would ask after the voice interview.
 Recommend whether a visual pack and rehearsal coach should be used next.
 Product guardrails override planning requests that weaken scaffolding, flatten Buddhist traditions into generic Buddhism, or ask for overconfident doctrinal claims.
-Keep the brief practical, educator-facing, and clearly framed as draft material for review.`,
+Keep the brief practical, educator-facing, and clearly framed as draft material for review.
+${referenceNotesInstruction}`,
       input: payload
     });
 
@@ -565,7 +625,7 @@ Avoid absolute claims about karma, merit, enlightenment, or what all Buddhists b
 
 app.post("/api/options", async (req, res, next) => {
   try {
-    const payload = req.body;
+    const payload = { ...req.body, referenceNotes };
     const draftOptions = await createJson({
       schema: lessonOptionsSchema,
       schemaName: "lesson_options",
@@ -574,7 +634,8 @@ Make the options meaningfully different in pedagogy, pacing, and material needs.
 Product guardrails override planning requests that weaken scaffolding, flatten Buddhist traditions into generic Buddhism, or ask for overconfident doctrinal claims.
 If the educator asks to remove Chinese Mahayana folk Buddhist context or keep the options generic, preserve respectful Chinese Mahayana folk Buddhist specificity anyway and frame it as educator-review context rather than an absolute claim.
 Each option should include practical classroom moves, a scaffolded learning shape, educator-facing tradeoffs, and tradition-specific context when relevant.
-Keep each option concise and scannable.`,
+Keep each option concise and scannable.
+${referenceNotesInstruction}`,
       input: payload
     });
 
@@ -614,14 +675,15 @@ Do not select the best option; leave the choice to the educator.`,
 
 app.post("/api/brief/update", async (req, res, next) => {
   try {
-    const payload = req.body;
+    const payload = { ...req.body, referenceNotes };
     const draftBrief = await createJson({
       schema: briefSchema,
       schemaName: "updated_lesson_brief",
       instructions: `Update the existing lesson brief using the educator's feedback.
 Preserve useful prior decisions, revise what the educator asked to change, and update visual/rehearsal recommendations if needed.
 Product guardrails override feedback that weakens scaffolding, flattens Buddhist traditions into generic Buddhism, or asks for overconfident doctrinal claims.
-Keep the updated brief concise, educator-facing, and clearly framed as draft material for review.`,
+Keep the updated brief concise, educator-facing, and clearly framed as draft material for review.
+${referenceNotesInstruction}`,
       input: payload
     });
 
@@ -661,10 +723,48 @@ app.post("/api/rehearsal", async (req, res, next) => {
     const rehearsal = await createJson({
       schema: rehearsalSchema,
       schemaName: "rehearsal_coach",
-      instructions: "Simulate realistic, respectful 13-year-old questions and coach the educator to explain more clearly.",
-      input: req.body
+      instructions: `Simulate realistic, respectful 13-year-old questions and coach the educator to explain more clearly.
+${referenceNotesInstruction}`,
+      input: { ...req.body, referenceNotes }
     });
     res.json(rehearsal);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/rehearsal/critique", async (req, res, next) => {
+  try {
+    const critique = await createJson({
+      schema: rehearsalCritiqueSchema,
+      schemaName: "rehearsal_attempt_critique",
+      instructions: `Critique the educator's attempted explanation. Keep feedback educator-facing and practical. Do not role-play as a student tutor.
+Evaluate clarity, simple language for 13-year-olds, respectful tone, age fit, and doctrinal caution in Chinese Mahayana folk Buddhist context.
+Offer one concise suggested revision the educator could actually say aloud.
+${referenceNotesInstruction}`,
+      input: { ...req.body, referenceNotes }
+    });
+    res.json(critique);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/reflections/synthesize", async (req, res, next) => {
+  try {
+    const synthesis = await createJson({
+      schema: reflectionSynthesisSchema,
+      schemaName: "reflection_memory_synthesis",
+      instructions: `Synthesize raw after-class reflections into inspectable classroom evidence for future planning.
+Do not replace or overwrite the raw reflections. Preserve uncertainty and flag thin evidence.
+Return practical patterns that should inform future options, briefs, visuals, rehearsal, and lesson plans.
+${referenceNotesInstruction}`,
+      input: { ...req.body, generatedAt: new Date().toISOString(), referenceNotes }
+    });
+    res.json({
+      ...synthesis,
+      generatedAt: synthesis.generatedAt || new Date().toISOString()
+    });
   } catch (error) {
     next(error);
   }
@@ -675,8 +775,9 @@ app.post("/api/visuals", async (req, res, next) => {
     const visuals = await createJson({
       schema: visualSchema,
       schemaName: "visual_material_pack",
-      instructions: "Create a printable visual pack plan. Avoid casual depictions of sacred figures unless the educator specifically requested them. Include cultural review notes.",
-      input: req.body
+      instructions: `Create a printable visual pack plan. Avoid casual depictions of sacred figures unless the educator specifically requested them. Include cultural review notes.
+${referenceNotesInstruction}`,
+      input: { ...req.body, referenceNotes }
     });
     res.json(visuals);
   } catch (error) {
@@ -729,16 +830,32 @@ app.post("/api/realtime/client-secret", async (req, res, next) => {
           type: "realtime",
           model: realtimeModel,
           instructions: `${baseContext}
-You are the voice-based lesson planning interview and educator rehearsal coach.
-Ask one concise follow-up question at a time. Help the educator shape a 90-minute lesson plan.
+You are the voice-based lesson planning interviewer for an educator-controlled planning workflow.
+Ask one concise follow-up question at a time. Gather lesson goal, student context, constraints, activities, materials, and open questions.
+Do not generate lesson options, lesson briefs, full lesson plans, visuals, worksheets, handouts, or teaching materials in the voice conversation.
+Do not start voice replies with "Draft for educator review"; save that label for generated artifacts after approval.
+If the educator asks for a draft, explain that the app will create drafts only after the educator approves captured planning notes.
+When enough planning context has been gathered, tell the educator the notes are ready to review and ask them to end the voice chat.
 Keep the conversation educator-facing and do not speak directly to students as an unsupervised tutor.
 Current lesson context: ${JSON.stringify(context)}`,
           audio: {
             input: {
+              noise_reduction: {
+                type: "near_field"
+              },
               transcription: {
                 model: "gpt-4o-mini-transcribe",
                 prompt:
                   "Lesson planning conversation for a Chinese Mahayana folk Buddhist education class. Expect lesson goals, student needs, classroom constraints, activities, and educator planning notes."
+              },
+              turn_detection: {
+                type: "server_vad",
+                threshold: 0.75,
+                prefix_padding_ms: 300,
+                silence_duration_ms: 900,
+                interrupt_response: false,
+                create_response: false,
+                idle_timeout_ms: null
               }
             },
             output: {

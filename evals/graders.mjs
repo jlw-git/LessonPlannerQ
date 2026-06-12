@@ -209,6 +209,45 @@ const schemaChecks = {
     return pass("rehearsal_schema", "Rehearsal output includes the expected top-level contract.");
   },
 
+  rehearsal_critique_schema(output) {
+    const required = [
+      "practicedQuestion",
+      "educatorAttempt",
+      "summary",
+      "strengths",
+      "clarityNotes",
+      "toneAndAgeFitNotes",
+      "traditionCautionNotes",
+      "suggestedRevision",
+      "nextPracticePrompt",
+      "briefFeedbackSuggestion",
+      "educatorReviewNotes"
+    ];
+    if (!hasAllKeys(output, required)) return fail("rehearsal_critique_schema", "Rehearsal critique is missing one or more required fields.");
+    if (!listHasText(output.clarityNotes) || !listHasText(output.toneAndAgeFitNotes) || !listHasText(output.traditionCautionNotes)) {
+      return fail("rehearsal_critique_schema", "Expected clarity, age-fit, and tradition-caution notes.");
+    }
+    return pass("rehearsal_critique_schema", "Rehearsal critique includes the expected feedback contract.");
+  },
+
+  reflection_synthesis_schema(output) {
+    const required = [
+      "summary",
+      "workedWellPatterns",
+      "avoidOrAdjustPatterns",
+      "studentResponseThemes",
+      "nextTimeGuidance",
+      "cautionNotes",
+      "sourceReflectionIds",
+      "generatedAt"
+    ];
+    if (!hasAllKeys(output, required)) return fail("reflection_synthesis_schema", "Reflection synthesis is missing one or more required fields.");
+    if (!listHasText(output.workedWellPatterns) || !listHasText(output.nextTimeGuidance) || !Array.isArray(output.sourceReflectionIds)) {
+      return fail("reflection_synthesis_schema", "Expected useful patterns, next-time guidance, and source reflection ids.");
+    }
+    return pass("reflection_synthesis_schema", "Reflection synthesis includes inspectable classroom evidence.");
+  },
+
   interview_extraction_schema(output) {
     const required = ["topic", "lessonObjectives", "planningRequirements", "openQuestions", "confidenceNotes", "sourceSummary"];
     if (!hasAllKeys(output, required)) {
@@ -243,7 +282,8 @@ const productChecks = {
     }
     if (
       (Array.isArray(output.reviewNotes) && output.reviewNotes.length > 0) ||
-      (Array.isArray(output.coachingNotes) && output.coachingNotes.length > 0)
+      (Array.isArray(output.coachingNotes) && output.coachingNotes.length > 0) ||
+      (Array.isArray(output.educatorReviewNotes) && output.educatorReviewNotes.length > 0)
     ) {
       return pass("educator_control", "Output includes educator-facing review or coaching notes.");
     }
@@ -314,6 +354,22 @@ const productChecks = {
       return pass("sensitive_review", "Output handles sensitive doctrinal framing cautiously.");
     }
     return fail("sensitive_review", "Expected cautious handling of sensitive doctrinal framing.");
+  },
+
+  attempt_feedback(output) {
+    const text = textOf(output);
+    if (hasAny(text, ["clarity", "tone", "age", "13", "review", "educator", "careful", "revision", "say"])) {
+      return pass("attempt_feedback", "Critique gives practical educator-facing feedback.");
+    }
+    return fail("attempt_feedback", "Expected practical critique of the educator attempt.");
+  },
+
+  inspectable_memory(output) {
+    const text = textOf(output);
+    if (hasAny(text, ["worked", "avoid", "adjust", "student", "next", "evidence", "reflection", "classroom"])) {
+      return pass("inspectable_memory", "Synthesis reads as inspectable classroom evidence.");
+    }
+    return fail("inspectable_memory", "Expected inspectable classroom evidence rather than generic summary.");
   },
 
   interview_extraction_guardrails(output) {

@@ -122,3 +122,36 @@ export type RehearsalCritique = {
   briefFeedbackSuggestion: string;
   educatorReviewNotes: string[];
 };
+
+export type ReflectionMemorySynthesis = {
+  summary: string;
+  workedWellPatterns: string[];
+  avoidOrAdjustPatterns: string[];
+  studentResponseThemes: string[];
+  nextTimeGuidance: string[];
+  cautionNotes: string[];
+  sourceReflectionIds: string[];
+  generatedAt: string;
+};
+
+export type PlanningMetricEventName =
+  | "planning_started"
+  | "voice_notes_approved"
+  | "options_generated"
+  | "option_selected"
+  | "brief_generated"
+  | "brief_refined"
+  | "lesson_generated"
+  | "visuals_generated"
+  | "image_generated"
+  | "rehearsal_generated"
+  | "rehearsal_critiqued"
+  | "reflection_saved"
+  | "artifact_printed";
+
+export type PlanningMetricEvent = {
+  id: string;
+  name: PlanningMetricEventName;
+  createdAt: string;
+  detail?: string;
+};

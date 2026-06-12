@@ -24,6 +24,15 @@ Use these instructions when an AI coding assistant works in this repository.
 - Prefer practical classroom moves over long theory.
 - Make play, visuals, rehearsal, and self-directed learning serve the lesson objective.
 
+## UX And Copy Guardrails
+
+- Make the start flow voice-first and typing-second: primary copy should invite the educator to talk about the lesson; typed input is the fallback.
+- Use plain, human wording over formal or internal product language. Prefer "Talk about it" and "Type it out" over terms like interview, notes, MVP, signals, guardrails, or critic in the educator UI.
+- Keep copy concise but concrete. Say what the educator should provide: topic, objectives, student needs, timing, and constraints.
+- Avoid explaining how PlannerQ works unless it changes the educator's next action. The UI should invite lesson requirements, not describe the system.
+- Remove or defer visible complexity. Workflow rails, metrics, reference notes, and extra panels should appear only when they help the current task.
+- Professional means calm, focused, and low-clutter: one dominant action per phase, no competing calls to action, and every visible element must earn its place.
+
 ## Implementation Notes
 
 - Frontend code lives mainly in `src/App.tsx`, with shared types in `src/types.ts` and styles in `src/styles.css`.

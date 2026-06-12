@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   BookOpen,
@@ -6,6 +6,7 @@ import {
   ChevronDown,
   CheckCircle2,
   Circle,
+  Copy,
   FileText,
   Image,
   Loader2,
@@ -14,6 +15,7 @@ import {
   NotebookPen,
   Pencil,
   PlayCircle,
+  Printer,
   RefreshCw,
   Save,
   Target,
@@ -32,9 +34,14 @@ import type {
   LessonOptionsResponse,
   LessonPlan,
   OptionAgentReview,
+  PlanningMetricEvent,
+  PlanningMetricEventName,
+  ReflectionMemorySynthesis,
   Rehearsal,
+  RehearsalCritique,
   VisualPack
 } from "./types";
+import { referenceNotes } from "./referenceNotes";
 
 type FormState = {
   topic: string;
@@ -57,6 +64,8 @@ type FlowStep = {
   status: "done" | "active" | "idle";
 };
 
+type WorkflowStage = "capture" | "review" | "choose" | "brief" | "plan" | "reflect";
+
 type LessonReflection = {
   id: string;
   date: string;
@@ -71,7 +80,15 @@ type LessonReflection = {
 type ReflectionDraft = Omit<LessonReflection, "id">;
 
 const reflectionStorageKey = "lesson-planner-q-reflections";
+const reflectionSynthesisStorageKey = "lesson-planner-q-reflection-synthesis";
+const metricsStorageKey = "lesson-planner-q-metrics";
+const transcriptStorageKey = "lesson-planner-q-last-voice-transcript";
 const voiceStarterItemId = "plannerq-voice-starter";
+const realtimeTurnInstructions = `Continue the educator planning conversation.
+Ask exactly one concise follow-up question, then wait.
+Do not create lesson options, a lesson outline, a lesson plan, visuals, worksheets, handouts, or materials.
+Do not label voice replies as "Draft for educator review."
+When enough context has been gathered, say that the lesson requirements are ready to review and ask the educator to end the voice chat.`;
 
 const initialForm: FormState = {
   topic: "",
@@ -108,6 +125,69 @@ function loadReflections() {
     }
     const parsed = JSON.parse(saved);
     return Array.isArray(parsed) ? (parsed as LessonReflection[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadReflectionSynthesis() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const saved = window.localStorage.getItem(reflectionSynthesisStorageKey);
+    if (!saved) {
+      return null;
+    }
+    const parsed = JSON.parse(saved);
+    return parsed && typeof parsed === "object" ? (parsed as ReflectionMemorySynthesis) : null;
+  } catch {
+    return null;
+  }
+}
+
+function loadMetricEvents() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const saved = window.localStorage.getItem(metricsStorageKey);
+    if (!saved) {
+      return [];
+    }
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? (parsed as PlanningMetricEvent[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function loadVoiceTranscript() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const saved = window.localStorage.getItem(transcriptStorageKey);
+    if (!saved) {
+      return [];
+    }
+    const parsed = JSON.parse(saved);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed
+      .filter(
+        (entry): entry is TranscriptEntry =>
+          entry &&
+          typeof entry.id === "string" &&
+          (entry.role === "educator" || entry.role === "planner") &&
+          typeof entry.text === "string" &&
+          (entry.status === "partial" || entry.status === "final")
+      )
+      .map((entry) => ({ ...entry, status: "final" as const }));
   } catch {
     return [];
   }
@@ -195,6 +275,45 @@ function describeApiConnectionError(error: unknown) {
   return error instanceof Error ? error.message : "Could not reach the lesson-planning API.";
 }
 
+function normalizeTranscriptText(text: string) {
+  return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function isMeaningfulEducatorTurn(text: string, latestPlannerSpeech: string) {
+  const normalized = normalizeTranscriptText(text);
+
+  if (normalized.length < 8) {
+    return false;
+  }
+
+  if (
+    normalized.startsWith("start a voice lesson planning interview") ||
+    normalized.includes("draft for educator review")
+  ) {
+    return false;
+  }
+
+  const words = normalized.match(/[a-z0-9]+/g) || [];
+  if (words.length < 3) {
+    return false;
+  }
+
+  const latestPlanner = normalizeTranscriptText(latestPlannerSpeech);
+  return !latestPlanner || (normalized !== latestPlanner && !latestPlanner.includes(normalized));
+}
+
+function cleanTranscriptEntries(entries: TranscriptEntry[]) {
+  return entries
+    .map((entry) => ({ ...entry, text: entry.text.trim() }))
+    .filter((entry) => entry.text.length > 0 && !entry.text.startsWith("Start a voice lesson planning interview"));
+}
+
+function formatTranscript(entries: TranscriptEntry[]) {
+  return cleanTranscriptEntries(entries)
+    .map((entry) => `${entry.role === "educator" ? "You" : "PlannerQ"}: ${entry.text}`)
+    .join("\n\n");
+}
+
 function List({ items }: { items: string[] }) {
   return (
     <ul className="stack-list">
@@ -202,6 +321,46 @@ function List({ items }: { items: string[] }) {
         <li key={`${item}-${index}`}>{item}</li>
       ))}
     </ul>
+  );
+}
+
+function TranscriptReviewPanel({
+  entries,
+  copied,
+  onCopy
+}: {
+  entries: TranscriptEntry[];
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const visibleEntries = cleanTranscriptEntries(entries);
+
+  if (visibleEntries.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="transcript-review-card" aria-label="Voice transcript">
+      <div className="transcript-review-head">
+        <div>
+          <span className="section-eyebrow">Voice transcript</span>
+          <h2>Review what was captured</h2>
+          <p>Use this as source notes before trusting the extracted requirements.</p>
+        </div>
+        <button className="quiet-button compact-button" onClick={onCopy}>
+          <Copy size={16} />
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <div className="transcript-review-log">
+        {visibleEntries.map((entry) => (
+          <article className={entry.role} key={entry.id}>
+            <strong>{entry.role === "educator" ? "You" : "PlannerQ"}</strong>
+            <p>{entry.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -236,11 +395,11 @@ function AgentReviewPanel({
           <List items={review.strengths} />
         </div>
         <div>
-          <strong>Revisions checked</strong>
+          <strong>Revision check</strong>
           <List items={revisionItems} />
         </div>
         <div>
-          <strong>Pedagogy notes</strong>
+          <strong>Pedagogy</strong>
           <List items={review.pedagogyNotes} />
         </div>
         <div>
@@ -250,7 +409,7 @@ function AgentReviewPanel({
       </div>
       {review.educatorReviewNotes.length > 0 && (
         <div className="agent-review-footer">
-          <strong>For educator review</strong>
+          <strong>Educator review</strong>
           <List items={review.educatorReviewNotes} />
         </div>
       )}
@@ -262,9 +421,9 @@ function LessonAgentReviewPanel({ review }: { review: LessonAgentReview }) {
   return (
     <AgentReviewPanel
       review={review}
-      title="Plan critic review"
-      ariaLabel="Plan critic review"
-      noRevisionCopy="No required revision after critic review."
+      title="Plan review"
+      ariaLabel="Plan review"
+      noRevisionCopy="No required revision."
     />
   );
 }
@@ -273,9 +432,9 @@ function OptionAgentReviewPanel({ review }: { review: OptionAgentReview }) {
   return (
     <AgentReviewPanel
       review={review}
-      title="Option critic review"
-      ariaLabel="Option critic review"
-      noRevisionCopy="No required option revision after critic review."
+      title="Option review"
+      ariaLabel="Option review"
+      noRevisionCopy="No required revision."
     />
   );
 }
@@ -284,10 +443,48 @@ function BriefAgentReviewPanel({ review }: { review: BriefAgentReview }) {
   return (
     <AgentReviewPanel
       review={review}
-      title="Brief critic review"
-      ariaLabel="Brief critic review"
-      noRevisionCopy="No required brief revision after critic review."
+      title="Outline review"
+      ariaLabel="Outline review"
+      noRevisionCopy="No required revision."
     />
+  );
+}
+
+function LessonQualityGate({ review }: { review: LessonAgentReview }) {
+  const revisionItems =
+    review.revisionRequired && review.revisionRequests.length > 0 ? review.revisionRequests : ["No required revision."];
+
+  return (
+    <aside className="quality-gate" aria-label="Lesson draft quality review">
+      <div className="quality-gate-heading">
+        <CheckCircle2 size={20} />
+        <div>
+          <span>Quality check</span>
+          <strong>{review.revisionRequired ? "Needs educator attention" : "Passed with educator review"}</strong>
+          <p>{review.summary}</p>
+        </div>
+      </div>
+      <div className="quality-gate-grid">
+        <div>
+          <strong>Pedagogy</strong>
+          <List items={review.pedagogyNotes} />
+        </div>
+        <div>
+          <strong>Tradition fit</strong>
+          <List items={review.traditionReviewNotes} />
+        </div>
+        <div>
+          <strong>Revision</strong>
+          <List items={revisionItems} />
+        </div>
+      </div>
+      {review.educatorReviewNotes.length > 0 && (
+        <div className="quality-gate-footer">
+          <strong>Educator review</strong>
+          <List items={review.educatorReviewNotes} />
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -295,19 +492,21 @@ function InterviewExtractionReview({
   draft,
   onUpdate,
   onApply,
-  onDismiss
+  onDismiss,
+  containerRef
 }: {
   draft: InterviewExtraction;
   onUpdate: (field: "topic" | "lessonObjectives" | "planningRequirements", value: string) => void;
   onApply: () => void;
   onDismiss: () => void;
+  containerRef?: React.Ref<HTMLElement>;
 }) {
   return (
-    <section className="interview-review-card" aria-label="Review extracted interview notes">
+    <section className="interview-review-card" aria-label="Review lesson requirements" ref={containerRef}>
       <div className="interview-review-head">
         <div>
-          <span className="section-eyebrow">Interview notes</span>
-          <h2>Review extracted planning fields</h2>
+          <span className="section-eyebrow">Lesson requirements</span>
+          <h2>Review requirements</h2>
         </div>
         <button className="icon-button" onClick={onDismiss} aria-label="Dismiss interview extraction">
           <X size={18} />
@@ -331,17 +530,61 @@ function InterviewExtractionReview({
       <div className="interview-review-grid">
         <div>
           <strong>Open questions</strong>
-          <List items={draft.openQuestions.length > 0 ? draft.openQuestions : ["No open questions extracted."]} />
+          <List items={draft.openQuestions.length > 0 ? draft.openQuestions : ["No open questions found."]} />
         </div>
         <div>
-          <strong>Confidence notes</strong>
-          <List items={draft.confidenceNotes.length > 0 ? draft.confidenceNotes : ["No additional confidence notes."]} />
+          <strong>Confidence</strong>
+          <List items={draft.confidenceNotes.length > 0 ? draft.confidenceNotes : ["No additional confidence concerns."]} />
         </div>
       </div>
-      <div className="typed-actions">
+      <div className="inline-actions">
         <button onClick={onApply} className="primary">
           <CheckCircle2 size={18} />
-          Apply to typed brief
+          Use these requirements
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function LessonRequirementsReady({
+  form,
+  onUpdate,
+  onGenerateOptions,
+  loading
+}: {
+  form: FormState;
+  onUpdate: (field: keyof FormState, value: string) => void;
+  onGenerateOptions: () => void;
+  loading: string | null;
+}) {
+  return (
+    <section className="approved-notes-card" aria-label="Lesson requirements ready">
+      <div>
+        <span className="section-eyebrow">Lesson requirements</span>
+        <h2>Ready for options</h2>
+        <p>Review or adjust the requirements, then create options.</p>
+      </div>
+      <div className="typed-fallback-fields">
+        <label>
+          Topic
+          <input value={form.topic} onChange={(event) => onUpdate("topic", event.target.value)} />
+        </label>
+        <label>
+          <Target size={16} />
+          Learning goals
+          <textarea value={form.lessonObjectives} onChange={(event) => onUpdate("lessonObjectives", event.target.value)} rows={2} />
+        </label>
+        <label>
+          <MessageCircle size={16} />
+          Constraints
+          <textarea value={form.planningRequirements} onChange={(event) => onUpdate("planningRequirements", event.target.value)} rows={3} />
+        </label>
+      </div>
+      <div className="inline-actions">
+        <button onClick={onGenerateOptions} disabled={Boolean(loading)} className="primary">
+          {loading === "options" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+          Create options
         </button>
       </div>
     </section>
@@ -420,15 +663,15 @@ function describeRealtimeError(err: unknown) {
   }
 
   if (err instanceof DOMException && (err.name === "NotAllowedError" || err.name === "SecurityError")) {
-    return "Microphone access is blocked for this browser. Check site permissions for this preview, or use \"Write it out\".";
+    return "Microphone access is blocked for this browser. Check site permissions for this preview, or type it out.";
   }
 
   if (err instanceof DOMException && err.name === "NotFoundError") {
-    return "No microphone was found. Connect or enable a microphone, or use \"Write it out\".";
+    return "No microphone was found. Connect or enable a microphone, or type it out.";
   }
 
   if (err instanceof Error && /permission denied|notallowed/i.test(err.message)) {
-    return "Microphone access is blocked for this browser. Check site permissions for this preview, or use \"Write it out\".";
+    return "Microphone access is blocked for this browser. Check site permissions for this preview, or type it out.";
   }
 
   return err instanceof Error ? err.message : "Could not start realtime voice session";
@@ -452,44 +695,109 @@ export default function App() {
   const [showLessonMemory, setShowLessonMemory] = useState(false);
   const [reflectionDraft, setReflectionDraft] = useState<ReflectionDraft>(initialReflectionDraft);
   const [reflections, setReflections] = useState<LessonReflection[]>(loadReflections);
+  const [reflectionSynthesis, setReflectionSynthesis] = useState<ReflectionMemorySynthesis | null>(loadReflectionSynthesis);
+  const [synthesisStale, setSynthesisStale] = useState(false);
   const [editingReflectionId, setEditingReflectionId] = useState<string | null>(null);
+  const [metricEvents, setMetricEvents] = useState<PlanningMetricEvent[]>(loadMetricEvents);
+  const [practiceQuestion, setPracticeQuestion] = useState("");
+  const [practiceAttempt, setPracticeAttempt] = useState("");
+  const [rehearsalCritique, setRehearsalCritique] = useState<RehearsalCritique | null>(null);
   const [realtimeStatus, setRealtimeStatus] = useState<"idle" | "connecting" | "live">("idle");
-  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>(loadVoiceTranscript);
+  const [transcriptCopied, setTranscriptCopied] = useState(false);
   const [interviewDraft, setInterviewDraft] = useState<InterviewExtraction | null>(null);
+  const [approvedInterviewDraft, setApprovedInterviewDraft] = useState<InterviewExtraction | null>(null);
   const [interviewApplied, setInterviewApplied] = useState(false);
   const [plannerMuted, setPlannerMuted] = useState(false);
   const realtimePeer = useRef<RTCPeerConnection | null>(null);
   const realtimeStream = useRef<MediaStream | null>(null);
   const realtimeAudio = useRef<HTMLAudioElement | null>(null);
+  const realtimeChannel = useRef<RTCDataChannel | null>(null);
+  const realtimeResponseInFlight = useRef(false);
+  const latestPlannerSpeech = useRef("");
+  const handledEducatorTurnIds = useRef<Set<string>>(new Set());
   const transcriptRef = useRef<HTMLDivElement | null>(null);
+  const interviewReviewRef = useRef<HTMLElement | null>(null);
   const outputRef = useRef<HTMLDivElement | null>(null);
   const visualPackRef = useRef<HTMLDivElement | null>(null);
 
+  useEffect(() => {
+    const cleaned = cleanTranscriptEntries(transcript).map((entry) => ({ ...entry, status: "final" as const }));
+    if (cleaned.length === 0) {
+      window.localStorage.removeItem(transcriptStorageKey);
+      return;
+    }
+    window.localStorage.setItem(transcriptStorageKey, JSON.stringify(cleaned));
+  }, [transcript]);
+
+  const educatorTranscriptEntries = useMemo(
+    () =>
+      transcript.filter((entry) => {
+        const text = entry.text.trim();
+        return entry.role === "educator" && text.length > 0 && !text.startsWith("Start a voice lesson planning interview");
+      }),
+    [transcript]
+  );
+  const hasEducatorTranscript = educatorTranscriptEntries.length > 0;
+  const hasReviewableTranscript = realtimeStatus === "idle" && cleanTranscriptEntries(transcript).length > 0;
+  const selectedOption = selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex] ?? null;
+  const hasTypedBrief = Boolean(form.topic.trim() || form.lessonObjectives.trim() || form.planningRequirements.trim());
+  const hasApprovedVoiceNotes = Boolean(approvedInterviewDraft);
+  const workflowStage: WorkflowStage = showLessonMemory
+    ? "reflect"
+    : lesson
+      ? "plan"
+      : brief
+        ? "brief"
+        : lessonOptions.length > 0
+          ? "choose"
+          : interviewDraft || hasApprovedVoiceNotes || (hasEducatorTranscript && realtimeStatus === "idle")
+            ? "review"
+            : "capture";
+  const firstPlanningEvent = metricEvents
+    .filter((event) => event.name === "planning_started")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  const firstUsablePlanEvent = metricEvents
+    .filter((event) => event.name === "lesson_generated")
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  const timeToUsablePlan =
+    firstPlanningEvent && firstUsablePlanEvent
+      ? Math.max(
+          0,
+          Math.round((new Date(firstUsablePlanEvent.createdAt).getTime() - new Date(firstPlanningEvent.createdAt).getTime()) / 60000)
+        )
+      : null;
+
   const workflowSteps: FlowStep[] = [
     {
-      label: "Start",
-      detail: voiceSignal === "listening" || voiceSignal === "speaking" ? "Voice planning live" : "Voice conversation",
-      status: lessonOptions.length > 0 || brief || rehearsal || lesson ? "done" : "active"
+      label: "Capture",
+      detail: realtimeStatus !== "idle" ? "Captions live" : hasTypedBrief || hasEducatorTranscript ? "Context captured" : "Capture requirements",
+      status: workflowStage === "capture" ? "active" : "done"
+    },
+    {
+      label: "Review",
+      detail: hasApprovedVoiceNotes ? "Requirements approved" : interviewDraft ? "Review requirements" : "Confirm context",
+      status: workflowStage === "review" ? "active" : hasApprovedVoiceNotes || lessonOptions.length > 0 || brief || lesson ? "done" : "idle"
     },
     {
       label: "Choose",
       detail: lessonOptions.length > 0 ? `${lessonOptions.length} approaches ready` : "Compare approaches",
-      status: brief || rehearsal || lesson ? "done" : lessonOptions.length > 0 || loading === "options" ? "active" : "idle"
+      status: workflowStage === "choose" || loading === "options" ? "active" : brief || lesson ? "done" : "idle"
     },
     {
-      label: "Prepare",
-      detail: rehearsal ? "Rehearsal ready" : brief ? "Brief ready" : "Brief and rehearsal",
-      status: lesson ? "done" : brief || rehearsal || loading === "brief" || loading === "brief-update" || loading === "rehearsal" ? "active" : "idle"
+      label: "Outline",
+      detail: brief ? "Outline ready" : "Draft and refine",
+      status: workflowStage === "brief" || loading === "brief" || loading === "brief-update" ? "active" : lesson ? "done" : "idle"
     },
     {
-      label: "Build",
-      detail: visuals ? "Plan and visuals ready" : lesson ? "90-minute plan drafted" : "Full plan and visuals",
-      status: lesson || visuals ? "done" : loading === "lesson" || loading === "visuals" || loading === "image" ? "active" : "idle"
+      label: "Plan",
+      detail: lesson ? "Draft for review" : "Draft lesson",
+      status: workflowStage === "plan" || loading === "lesson" ? "active" : "idle"
     },
     {
-      label: "Reflection",
-      detail: reflections.length > 0 ? `${reflections.length} saved` : "Log what happened",
-      status: showLessonMemory ? "active" : "idle"
+      label: "Reflect",
+      detail: reflections.length > 0 ? `${reflections.length} saved` : "Save reflection",
+      status: workflowStage === "reflect" ? "active" : "idle"
     }
   ];
 
@@ -506,6 +814,7 @@ export default function App() {
       requiredScaffold: "Gradual release of responsibility: I do, We do, You do",
       selectedOption: selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex],
       lessonMemory: reflections.slice(0, 5).map((reflection) => ({
+        id: reflection.id,
         date: reflection.date,
         topic: reflection.topic,
         lessonPlan: reflection.lessonPlan,
@@ -518,12 +827,20 @@ export default function App() {
         reflections.length > 0
           ? "Use lessonMemory as prior classroom evidence. Carry forward what worked, avoid or adapt what did not, and explicitly consider nextTime notes when drafting options, briefs, visuals, rehearsal, and the full lesson."
           : "No prior lesson memory has been logged yet.",
+      reflectionSynthesis,
+      referenceNotes,
       safety: "Educator-facing draft. No unsupervised student-agent interaction."
     }),
-    [form, lessonOptions, reflections, selectedOptionIndex]
+    [form, lessonOptions, reflectionSynthesis, reflections, selectedOptionIndex]
   );
 
   const update = (field: keyof FormState, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+    setApprovedInterviewDraft(null);
+    setInterviewApplied(false);
+  };
+
+  const updateApprovedRequirements = (field: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
 
@@ -548,9 +865,26 @@ export default function App() {
     setReflectionDraft((current) => ({ ...current, [field]: value }));
   };
 
+  const trackMetric = (name: PlanningMetricEventName, detail?: string) => {
+    const event: PlanningMetricEvent = {
+      id: crypto.randomUUID(),
+      name,
+      detail,
+      createdAt: new Date().toISOString()
+    };
+    setMetricEvents((current) => {
+      const next = [event, ...current].slice(0, 200);
+      window.localStorage.setItem(metricsStorageKey, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const metricCount = (name: PlanningMetricEventName) => metricEvents.filter((event) => event.name === name).length;
+
   const persistReflections = (nextReflections: LessonReflection[]) => {
     setReflections(nextReflections);
     window.localStorage.setItem(reflectionStorageKey, JSON.stringify(nextReflections));
+    setSynthesisStale(Boolean(reflectionSynthesis));
   };
 
   const resetReflectionDraft = () => {
@@ -584,11 +918,13 @@ export default function App() {
           reflection.id === editingReflectionId ? { ...reflectionDraft, id: editingReflectionId } : reflection
         )
       );
+      trackMetric("reflection_saved", "updated");
       resetReflectionDraft();
       return;
     }
 
     persistReflections([{ ...reflectionDraft, id: crypto.randomUUID() }, ...reflections].slice(0, 20));
+    trackMetric("reflection_saved", "created");
     resetReflectionDraft();
   };
 
@@ -638,13 +974,25 @@ export default function App() {
     }
   };
 
+  const printArtifact = (artifact: "lesson" | "visuals") => {
+    document.body.dataset.printArtifact = artifact;
+    trackMetric("artifact_printed", artifact);
+    window.print();
+    window.setTimeout(() => {
+      delete document.body.dataset.printArtifact;
+    }, 500);
+  };
+
   const generateBrief = () => {
     setBrief(null);
     setLesson(null);
     setVisuals(null);
     setRehearsal(null);
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    return run("brief", () => postJson<LessonBrief>("/api/brief", requestPayload), setBrief);
+    return run("brief", () => postJson<LessonBrief>("/api/brief", requestPayload), (nextBrief) => {
+      setBrief(nextBrief);
+      trackMetric("brief_generated", nextBrief.title);
+    });
   };
 
   const generateOptions = () => {
@@ -657,21 +1005,15 @@ export default function App() {
     setVisuals(null);
     setRehearsal(null);
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (metricCount("planning_started") === 0) {
+      trackMetric("planning_started", "typed or approved notes");
+    }
     return run("options", () => postJson<LessonOptionsResponse>("/api/options", requestPayload), (result) => {
       setLessonOptions(result.options);
       setOptionReview(result.optionReview ?? null);
+      trackMetric("options_generated", `${result.options.length} options`);
     });
   };
-
-  const educatorTranscriptEntries = useMemo(
-    () =>
-      transcript.filter((entry) => {
-        const text = entry.text.trim();
-        return entry.role === "educator" && text.length > 0 && !text.startsWith("Start a voice lesson planning interview");
-      }),
-    [transcript]
-  );
-  const hasEducatorTranscript = educatorTranscriptEntries.length > 0;
 
   const extractInterviewNotes = () => {
     if (!hasEducatorTranscript) return;
@@ -691,8 +1033,26 @@ export default function App() {
           duration: requestPayload.duration,
           safety: requestPayload.safety
         }),
-      setInterviewDraft
+      (draft) => {
+        setApprovedInterviewDraft(null);
+        setInterviewDraft(draft);
+        setInterviewApplied(false);
+        window.setTimeout(() => interviewReviewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+      }
     );
+  };
+
+  const copyTranscript = async () => {
+    const text = formatTranscript(transcript);
+    if (!text) return;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      setTranscriptCopied(true);
+      window.setTimeout(() => setTranscriptCopied(false), 1800);
+    } catch {
+      setError("Could not copy the transcript in this browser. You can still select and copy the text.");
+    }
   };
 
   const applyInterviewDraft = () => {
@@ -704,8 +1064,10 @@ export default function App() {
       planningRequirements: interviewDraft.planningRequirements
     });
     clearGeneratedArtifacts();
+    setApprovedInterviewDraft(interviewDraft);
     setInterviewDraft(null);
     setInterviewApplied(true);
+    trackMetric("voice_notes_approved", interviewDraft.topic);
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -716,6 +1078,7 @@ export default function App() {
     setLesson(null);
     setVisuals(null);
     setRehearsal(null);
+    trackMetric("option_selected", `Option ${index + 1}`);
   };
 
   const updateBrief = () =>
@@ -729,6 +1092,7 @@ export default function App() {
             setVisuals(null);
             setRehearsal(null);
             setFeedback("");
+            trackMetric("brief_refined", updatedBrief.title);
           }
         )
       : undefined;
@@ -736,13 +1100,19 @@ export default function App() {
   const generateLesson = () => {
     setLesson(null);
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    return run("lesson", () => postJson<LessonPlan>("/api/lesson", { ...requestPayload, brief }), setLesson);
+    return run("lesson", () => postJson<LessonPlan>("/api/lesson", { ...requestPayload, brief }), (nextLesson) => {
+      setLesson(nextLesson);
+      trackMetric("lesson_generated", nextLesson.title);
+    });
   };
 
   const generateVisuals = () => {
     setVisuals(null);
     window.setTimeout(() => visualPackRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
-    return run("visuals", () => postJson<VisualPack>("/api/visuals", { ...requestPayload, brief, lesson }), setVisuals);
+    return run("visuals", () => postJson<VisualPack>("/api/visuals", { ...requestPayload, brief, lesson }), (nextVisuals) => {
+      setVisuals(nextVisuals);
+      trackMetric("visuals_generated", nextVisuals.packTitle);
+    });
   };
 
   const generateRehearsal = () =>
@@ -754,19 +1124,72 @@ export default function App() {
           brief,
           rehearsalPrompt: `Pretend you are a skeptical 13-year-old. Ask hard questions about ${form.topic}.`
         }),
-      setRehearsal
+      (nextRehearsal) => {
+        setRehearsal(nextRehearsal);
+        setPracticeQuestion(nextRehearsal.studentQuestions[0] || "");
+        setRehearsalCritique(null);
+        trackMetric("rehearsal_generated", nextRehearsal.scenario);
+      }
     );
+
+  const critiqueRehearsalAttempt = () => {
+    if (!practiceQuestion.trim() || !practiceAttempt.trim()) return;
+
+    return run(
+      "rehearsal-critique",
+      () =>
+        postJson<RehearsalCritique>("/api/rehearsal/critique", {
+          ...requestPayload,
+          brief,
+          lesson,
+          rehearsal,
+          practicedQuestion: practiceQuestion,
+          educatorAttempt: practiceAttempt
+        }),
+      (critique) => {
+        setRehearsalCritique(critique);
+        trackMetric("rehearsal_critiqued", critique.practicedQuestion);
+      }
+    );
+  };
+
+  const synthesizeReflectionMemory = () => {
+    if (reflections.length === 0) return;
+
+    return run(
+      "reflection-synthesis",
+      () =>
+        postJson<ReflectionMemorySynthesis>("/api/reflections/synthesize", {
+          reflections,
+          existingSynthesis: reflectionSynthesis,
+          referenceNotes
+        }),
+      (synthesis) => {
+        setReflectionSynthesis(synthesis);
+        setSynthesisStale(false);
+        window.localStorage.setItem(reflectionSynthesisStorageKey, JSON.stringify(synthesis));
+      }
+    );
+  };
 
   const generateImage = () =>
     visuals?.imagePrompt
       ? run(
           "image",
           () => postJson<{ b64: string | null; url: string | null }>("/api/image", { prompt: visuals.imagePrompt }),
-          (result) => setGeneratedImage(result.b64 ? `data:image/png;base64,${result.b64}` : result.url)
+          (result) => {
+            setGeneratedImage(result.b64 ? `data:image/png;base64,${result.b64}` : result.url);
+            trackMetric("image_generated", visuals.packTitle);
+          }
         )
       : undefined;
 
   const stopRealtime = () => {
+    realtimeChannel.current?.close();
+    realtimeChannel.current = null;
+    realtimeResponseInFlight.current = false;
+    latestPlannerSpeech.current = "";
+    handledEducatorTurnIds.current = new Set();
     realtimePeer.current?.close();
     realtimePeer.current = null;
     realtimeStream.current?.getTracks().forEach((track) => track.stop());
@@ -814,6 +1237,22 @@ export default function App() {
     window.setTimeout(() => transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight }), 0);
   };
 
+  const requestPlannerVoiceResponse = (channel = realtimeChannel.current) => {
+    if (!channel || channel.readyState !== "open" || realtimeResponseInFlight.current) {
+      return;
+    }
+
+    realtimeResponseInFlight.current = true;
+    channel.send(
+      JSON.stringify({
+        type: "response.create",
+        response: {
+          instructions: realtimeTurnInstructions
+        }
+      })
+    );
+  };
+
   const handleRealtimeEvent = (event: MessageEvent<string>) => {
     try {
       const data = JSON.parse(event.data);
@@ -840,8 +1279,15 @@ export default function App() {
         setVoiceSignal("listening");
         const id = data.item_id || data.response_id || "planner-live";
         if (typeof data.transcript === "string" || typeof data.text === "string") {
-          upsertTranscript(id, "planner", data.transcript || data.text, "replace", "final");
+          const text = data.transcript || data.text;
+          latestPlannerSpeech.current = text;
+          upsertTranscript(id, "planner", text, "replace", "final");
         }
+        return;
+      }
+
+      if (type === "response.done" || type === "response.cancelled") {
+        realtimeResponseInFlight.current = false;
         return;
       }
 
@@ -850,6 +1296,10 @@ export default function App() {
         const id = data.item_id || `educator-${Date.now()}`;
         if (typeof data.transcript === "string") {
           upsertTranscript(id, "educator", data.transcript, "replace", "final");
+          if (!handledEducatorTurnIds.current.has(id) && isMeaningfulEducatorTurn(data.transcript, latestPlannerSpeech.current)) {
+            handledEducatorTurnIds.current.add(id);
+            requestPlannerVoiceResponse();
+          }
         }
         return;
       }
@@ -892,15 +1342,26 @@ export default function App() {
     setRealtimeStatus("connecting");
     setVoiceSignal("connecting");
     setError(null);
+    if (metricCount("planning_started") === 0) {
+      trackMetric("planning_started", "voice");
+    }
+    window.localStorage.removeItem(transcriptStorageKey);
     setTranscript([]);
     setInterviewDraft(null);
+    setApprovedInterviewDraft(null);
     setInterviewApplied(false);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error("This browser does not support microphone access here. Use a browser with microphone support, or choose \"Write it out\".");
+        throw new Error("This browser does not support microphone access here. Use a browser with microphone support, or type it out.");
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      });
       realtimeStream.current = stream;
 
       const healthResponse = await fetch("/api/health");
@@ -942,6 +1403,7 @@ export default function App() {
       stream.getTracks().forEach((track) => peer.addTrack(track, stream));
 
       const channel = peer.createDataChannel("oai-events");
+      realtimeChannel.current = channel;
       channel.addEventListener("message", handleRealtimeEvent);
       channel.addEventListener("open", () => {
         channel.send(
@@ -954,13 +1416,13 @@ export default function App() {
               content: [
                 {
                   type: "input_text",
-                  text: `Start a voice lesson planning interview for this 90-minute lesson. Topic: ${form.topic}. Lesson objectives: ${form.lessonObjectives}. Planning requirements: ${form.planningRequirements}.`
+                  text: `Start an educator planning conversation for this 90-minute lesson. Ask concise follow-up questions for any missing context, gather lesson requirements, and stop at captured requirements. Do not generate lesson options, a lesson outline, a full lesson plan, visuals, worksheets, or materials in this voice conversation. Topic: ${form.topic}. Lesson objectives: ${form.lessonObjectives}. Planning requirements: ${form.planningRequirements}.`
                 }
               ]
             }
           })
         );
-        channel.send(JSON.stringify({ type: "response.create" }));
+        requestPlannerVoiceResponse(channel);
       });
 
       const offer = await peer.createOffer();
@@ -991,11 +1453,27 @@ export default function App() {
     }
   };
 
-  const selectedOption = selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex] ?? null;
-  const hasPlanContext = Boolean(brief || selectedOption || lessonOptions.length > 0);
-  const showPlanningShortcuts = hasPlanContext || lesson || rehearsal || visuals || showLessonMemory || reflections.length > 0;
-  const showWorkflowRail = Boolean(lesson);
-  const hasTypedBrief = Boolean(form.topic.trim() || form.lessonObjectives.trim() || form.planningRequirements.trim());
+  const showStartComposer =
+    realtimeStatus === "idle" &&
+    lessonOptions.length === 0 &&
+    !brief &&
+    !lesson &&
+    !interviewDraft &&
+    !hasEducatorTranscript &&
+    !hasApprovedVoiceNotes;
+  const showWorkflowRail =
+    realtimeStatus !== "idle" ||
+    hasTypedBrief ||
+    hasEducatorTranscript ||
+    Boolean(interviewDraft) ||
+    hasApprovedVoiceNotes ||
+    lessonOptions.length > 0 ||
+    Boolean(brief) ||
+    Boolean(lesson) ||
+    Boolean(rehearsal) ||
+    Boolean(visuals) ||
+    showLessonMemory ||
+    reflections.length > 0;
 
   return (
     <main className={`app-shell ${showWorkflowRail ? "with-workflow" : "without-workflow"}`}>
@@ -1014,36 +1492,36 @@ export default function App() {
       </aside>
 
       <div className="planner-workspace">
-        <div className={`planner-grid ${showPlanningShortcuts ? "with-shortcuts" : "solo"}`}>
+        <div className="planner-grid solo">
           <section className="planner-main">
 
-        {realtimeStatus === "idle" && (
+        {showStartComposer && (
           <section className="brief-composer feature-section" aria-label="Start lesson plan">
             <div className="composer-head">
               <div className="section-title">
                 <NotebookPen size={22} />
-                <h2>Let&apos;s plan</h2>
+                <h2>New lesson plan</h2>
               </div>
-              <p>Share three things: lesson goal, what students are like, and any must-haves or limits.</p>
+              <p>Share the topic, objectives, student needs, timing, and constraints.</p>
             </div>
 
             <div className="start-stack">
               <section className={`voice-primary-card mic-cta ${voiceSignal.includes("error") ? "has-error" : ""}`} aria-label="Voice planning">
                 <button onClick={startRealtime} className="primary voice-start-button" disabled={Boolean(loading)}>
                   <Mic size={18} />
-                  Talk it through
+                  Talk about it
                 </button>
               </section>
 
               <details className="typed-brief secondary-brief-card">
                 <summary>
                   <FileText size={18} />
-                  <span>Write it out</span>
+                  <span>Type it out</span>
                 </summary>
 
                 <div className="typed-fallback-fields">
                   <label>
-                    Lesson goal
+                    Topic
                     <input
                       value={form.topic}
                       onChange={(event) => update("topic", event.target.value)}
@@ -1053,30 +1531,30 @@ export default function App() {
 
                   <label>
                     <Target size={16} />
-                    What students should learn
+                    Learning goals
                     <textarea
                       value={form.lessonObjectives}
                       onChange={(event) => update("lessonObjectives", event.target.value)}
                       rows={2}
-                      placeholder="What should students understand or be able to do?"
+                      placeholder="What should students understand or practice?"
                     />
                   </label>
 
                   <label>
                     <MessageCircle size={16} />
-                    Students, must-haves, and limits
+                    Constraints
                     <textarea
                       value={form.planningRequirements}
                       onChange={(event) => update("planningRequirements", event.target.value)}
                       rows={3}
-                      placeholder="Student needs, activity preferences, materials, timing, or limits."
+                      placeholder="Timing, student needs, materials, or limits."
                     />
                   </label>
 
                   <div className="typed-actions">
                     <button onClick={generateOptions} disabled={Boolean(loading) || !hasTypedBrief} className="primary">
                       {loading === "options" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                      {lessonOptions.length > 0 ? "Regenerate lesson options" : "Generate lesson options"}
+                      {lessonOptions.length > 0 ? "Regenerate options" : "Create options"}
                     </button>
                   </div>
                 </div>
@@ -1100,8 +1578,8 @@ export default function App() {
         {realtimeStatus !== "idle" && (
           <section className="voice-stage" aria-live="polite">
             <div className="voice-stage-top">
-              <span>Planning chat</span>
-              <strong>{realtimeStatus === "connecting" ? "Connecting" : "Live"}</strong>
+              <span>Live captions</span>
+              <strong>{realtimeStatus === "connecting" ? "Connecting" : "Listening"}</strong>
             </div>
 
             <div className="conversation-shell">
@@ -1109,7 +1587,7 @@ export default function App() {
                 <button onClick={startRealtime} className="stage-mic" aria-label="End voice planning">
                   <Mic size={24} />
                 </button>
-                <p>{realtimeStatus === "connecting" ? "Connecting to PlannerQ..." : "PlannerQ is listening"}</p>
+                <p>{realtimeStatus === "connecting" ? "Connecting" : "Listening"}</p>
                 <button
                   aria-pressed={plannerMuted}
                   className="quiet-button compact-button mute-output-button"
@@ -1126,12 +1604,6 @@ export default function App() {
               <aside className="transcript-drawer">
                 <div className="transcript-head">
                   <h2>Live captions</h2>
-                  {hasEducatorTranscript && (
-                    <button onClick={extractInterviewNotes} disabled={Boolean(loading)} className="quiet-button compact-button">
-                      {loading === "interview-extract" ? <Loader2 className="spin" size={16} /> : <FileText size={16} />}
-                      Use notes
-                    </button>
-                  )}
                 </div>
                 <div className="transcript-log" ref={transcriptRef} aria-live="polite" aria-relevant="additions text">
                   {transcript.length === 0 ? (
@@ -1153,18 +1625,25 @@ export default function App() {
         )}
 
         <div className="content" ref={outputRef}>
-          {realtimeStatus === "idle" && hasEducatorTranscript && !interviewApplied && (
-            <section className="inline-draft interview-ready-card">
-              <div>
-                <span className="section-eyebrow">Voice interview</span>
-                <h2>Interview transcript is ready</h2>
-                <p>Extract editable planning fields from the transcript, then review them before generating lesson options.</p>
-              </div>
-              <button onClick={extractInterviewNotes} disabled={Boolean(loading) || !hasEducatorTranscript} className="primary">
-                {loading === "interview-extract" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                Use interview notes
-              </button>
-            </section>
+          {realtimeStatus === "idle" && hasEducatorTranscript && !interviewApplied && !interviewDraft && (
+            <>
+              <TranscriptReviewPanel entries={transcript} copied={transcriptCopied} onCopy={copyTranscript} />
+              <section className="inline-draft interview-ready-card">
+                <div>
+                  <span className="section-eyebrow">Lesson requirements</span>
+                  <h2>Review requirements</h2>
+                  <p>Turn the transcript into editable lesson requirements.</p>
+                </div>
+                <button onClick={extractInterviewNotes} disabled={Boolean(loading) || !hasEducatorTranscript} className="primary">
+                  {loading === "interview-extract" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
+                  Review requirements
+                </button>
+              </section>
+            </>
+          )}
+
+          {hasReviewableTranscript && (interviewDraft || (approvedInterviewDraft && lessonOptions.length === 0 && !brief && !lesson)) && (
+            <TranscriptReviewPanel entries={transcript} copied={transcriptCopied} onCopy={copyTranscript} />
           )}
 
           {interviewDraft && (
@@ -1173,40 +1652,45 @@ export default function App() {
               onUpdate={updateInterviewDraft}
               onApply={applyInterviewDraft}
               onDismiss={() => setInterviewDraft(null)}
+              containerRef={interviewReviewRef}
             />
+          )}
+
+          {realtimeStatus === "idle" && approvedInterviewDraft && lessonOptions.length === 0 && !brief && !lesson && (
+            <LessonRequirementsReady form={form} onUpdate={updateApprovedRequirements} onGenerateOptions={generateOptions} loading={loading} />
           )}
 
           {loading === "interview-extract" && (
             <LoadingState
-              title="Extracting interview notes"
-              description="Turning the voice transcript into editable planning fields for educator review."
+              title="Reviewing requirements"
+              description="Turning captions into editable lesson requirements."
             />
           )}
 
           {loading === "options" && (
             <LoadingState
-              title="Preparing lesson options"
-              description="Creating distinct ways to run the 90-minute lesson so you can compare before choosing."
+              title="Creating options"
+              description="Drafting three approaches for review."
             />
           )}
 
           {(loading === "brief" || loading === "brief-update") && (
             <LoadingState
-              title={loading === "brief-update" ? "Updating lesson brief" : "Drafting lesson brief"}
-              description="Turning the selected approach into a structured brief, clarifying questions, and recommended next steps."
+              title={loading === "brief-update" ? "Updating outline" : "Creating outline"}
+              description="Turning the selected approach into a concise lesson outline."
             />
           )}
 
           {loading === "lesson" && (
             <LoadingState
-              title="Drafting 90-minute lesson plan"
-              description="Building the teaching anchor, play activity, self-directed scaffold, reflection prompts, and educator review notes."
+              title="Drafting lesson plan"
+              description="Building the full draft for educator review."
             />
           )}
 
           {lessonOptions.length > 0 && (
             <Section
-              title="Choose lesson approach"
+              title="Choose an approach"
               eyebrow="Options"
               icon={<FileText size={22} />}
               actions={
@@ -1216,7 +1700,7 @@ export default function App() {
                 </button>
               }
             >
-              <p className="muted">Compare fit, tradeoffs, visual needs, and rehearsal focus before choosing.</p>
+              <p className="muted">Select one approach before creating the lesson outline.</p>
               {optionReview && <OptionAgentReviewPanel review={optionReview} />}
               <div className="option-picker">
                 {lessonOptions.map((option, index) => {
@@ -1235,11 +1719,11 @@ export default function App() {
                       <p>{option.bestFor}</p>
                       <dl className="option-compare-list">
                         <div>
-                          <dt>Visuals</dt>
+                          <dt>Materials</dt>
                           <dd>{option.visualPackRecommended ? "Recommended" : "Optional"}</dd>
                         </div>
                         <div>
-                          <dt>Rehearsal</dt>
+                          <dt>Practice</dt>
                           <dd>{option.rehearsalFocus}</dd>
                         </div>
                         <div>
@@ -1256,12 +1740,12 @@ export default function App() {
                       <div className="option-card-actions">
                         <button onClick={() => selectOption(index)}>
                           {isSelected ? <CheckCircle2 size={18} /> : <FileText size={18} />}
-                          {isSelected ? "Selected" : "Select"}
+                          {isSelected ? "Selected" : "Use this"}
                         </button>
                         {isSelected && (
                           <button onClick={generateBrief} disabled={Boolean(loading)} className="primary">
                             {loading === "brief" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
-                            Draft brief
+                            Create lesson outline
                           </button>
                         )}
                         <button
@@ -1278,7 +1762,7 @@ export default function App() {
                         <div className="option-expanded">
                           <div className="option-detail-header">
                             <span className="option-pill">
-                              {option.visualPackRecommended ? "Visuals recommended" : "Visuals optional"}
+                              {option.visualPackRecommended ? "Materials recommended" : "Materials optional"}
                             </span>
                           </div>
                           <p>{option.approach}</p>
@@ -1312,24 +1796,18 @@ export default function App() {
           {brief && (
             <Section
               title={brief.title}
-              eyebrow="Brief"
+              eyebrow="Lesson outline"
               icon={<FileText size={22} />}
               actions={
-                <>
-                  <button onClick={generateBrief} disabled={Boolean(loading)} className="quiet-button">
-                    {loading === "brief" ? <Loader2 className="spin" size={18} /> : <RefreshCw size={18} />}
-                    Regenerate brief
-                  </button>
-                  <button onClick={seedReflectionFromCurrentPlan} className="quiet-button">
-                    <Save size={18} />
-                    Save note
-                  </button>
-                </>
+                <button onClick={generateBrief} disabled={Boolean(loading)} className="quiet-button">
+                  {loading === "brief" ? <Loader2 className="spin" size={18} /> : <RefreshCw size={18} />}
+                  Regenerate
+                </button>
               }
             >
               <div className="brief-hero">
                 <div>
-                  <span>Brief summary</span>
+                  <span>Outline summary</span>
                   <p>{brief.briefSummary}</p>
                 </div>
                 <div>
@@ -1340,117 +1818,18 @@ export default function App() {
 
               {brief.agentReview && <BriefAgentReviewPanel review={brief.agentReview} />}
 
-              <div className="two-col">
-                <div>
-                  <h3>Clarifying questions</h3>
-                  <List items={brief.clarifyingQuestions} />
-                </div>
-                <div>
-                  <h3>Suggested structure</h3>
-                  <List items={brief.suggestedStructure} />
-                </div>
-              </div>
-
-              <div className="two-col">
-                <div>
-                  <h3>Key choices</h3>
-                  <List items={brief.keyChoices} />
-                </div>
-                <div>
-                  <h3>Recommended next move</h3>
-                  <p className="muted">
-                    Rehearse the explanation before drafting the full plan, then use feedback to refine the brief.
-                  </p>
-                </div>
-              </div>
-
-              <div className="recommendation-grid">
-                <article>
-                  <strong>{brief.visualPackRecommended ? "Visual pack recommended" : "Visual pack optional"}</strong>
-                  <p>{brief.visualPackRationale}</p>
-                  <button onClick={generateVisuals} disabled={Boolean(loading)}>
-                    {loading === "visuals" ? <Loader2 className="spin" size={18} /> : <Image size={18} />}
-                    Create visual pack
-                  </button>
-                </article>
-                <article>
-                  <strong>{brief.rehearsalRecommended ? "Rehearsal recommended" : "Rehearsal optional"}</strong>
-                  <p>{brief.rehearsalFocus}</p>
-                  <button onClick={generateRehearsal} disabled={Boolean(loading)}>
-                    {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
-                    Practice with coach
-                  </button>
-                </article>
-              </div>
-
-              <div className="embedded-output" ref={visualPackRef}>
-                {loading === "visuals" && (
-                  <section className="drafting-state inline-draft" aria-live="polite">
-                    <div className="section-title">
-                      <Loader2 className="spin" size={20} />
-                      <h3>Creating visual pack</h3>
-                    </div>
-                    <p>Creating story cards, scenario cards, storyboard panels, and worksheet prompts for this brief.</p>
-                    <div className="draft-preview" aria-hidden="true">
-                      <span />
-                      <span />
-                      <span />
-                    </div>
-                  </section>
-                )}
-
-                {visuals && (
-                  <section className="inline-result">
-                    <div className="section-title">
-                      <Image size={20} />
-                      <h3>{visuals.packTitle}</h3>
-                    </div>
-                    <p>{visuals.styleGuidance}</p>
-                    <div className="image-prompt">
-                      <p>{visuals.imagePrompt}</p>
-                      <button onClick={generateImage} disabled={Boolean(loading)}>
-                        {loading === "image" ? <Loader2 className="spin" size={18} /> : <PlayCircle size={18} />}
-                        Create image
-                      </button>
-                    </div>
-                    {generatedImage && (
-                      <div className="generated-image">
-                        <img src={generatedImage} alt="Generated lesson visual" />
-                      </div>
-                    )}
-                    <div className="two-col">
-                      <div>
-                        <h3>Scenario cards</h3>
-                        <List items={visuals.scenarioCards} />
-                      </div>
-                      <div>
-                        <h3>Value cards</h3>
-                        <List items={visuals.valueCards} />
-                      </div>
-                    </div>
-                    <h3>Storyboard panels</h3>
-                    <div className="cards-grid">
-                      {visuals.storyboardPanels.map((panel, index) => (
-                        <article key={`${panel.panel}-${index}`}>
-                          <strong>{panel.panel}</strong>
-                          <p>{panel.caption}</p>
-                          <span>{panel.studentPrompt}</span>
-                        </article>
-                      ))}
-                    </div>
-                    <h3>Worksheet prompts</h3>
-                    <List items={visuals.worksheetPrompts} />
-                  </section>
-                )}
+              <div>
+                <h3>Key choices</h3>
+                <List items={brief.keyChoices} />
               </div>
 
               <label className="feedback-box">
-                Refine the brief
+                Revision notes
                 <textarea
                   value={feedback}
                   onChange={(event) => setFeedback(event.target.value)}
                   rows={4}
-                  placeholder="Answer clarifying questions, adjust the activity, change the tone, or add notes from rehearsal."
+                  placeholder="Add changes for the outline."
                 />
               </label>
 
@@ -1459,9 +1838,9 @@ export default function App() {
                   {loading === "brief-update" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
                   Apply refinement
                 </button>
-                <button onClick={generateLesson} disabled={Boolean(loading)}>
+                <button onClick={generateLesson} disabled={Boolean(loading)} className="primary">
                   {loading === "lesson" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
-                  Draft full lesson plan
+                  Create lesson plan
                 </button>
               </div>
             </Section>
@@ -1469,26 +1848,26 @@ export default function App() {
 
           {loading === "rehearsal" && (
             <LoadingState
-              title="Preparing rehearsal coach"
-              description="Creating likely student questions, simpler language, and practice responses for the selected brief."
+              title="Preparing practice"
+              description="Creating likely questions and practice language."
             />
           )}
 
           {rehearsal && (
             <Section
-              title="Rehearsal coach"
-              eyebrow="Rehearse"
+              title="Practice explanation"
+              eyebrow="Practice"
               icon={<Mic size={22} />}
               actions={
                 <button onClick={generateRehearsal} disabled={Boolean(loading)} className="quiet-button">
                   {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <RefreshCw size={18} />}
-                  Regenerate coach
+                  Regenerate
                 </button>
               }
             >
               <div className="brief-hero single">
                 <div>
-                  <span>Practice scenario</span>
+                  <span>Scenario</span>
                   <p>{rehearsal.scenario}</p>
                 </div>
               </div>
@@ -1498,147 +1877,355 @@ export default function App() {
                   <List items={rehearsal.studentQuestions} />
                 </div>
                 <div>
-                  <h3>Simpler language</h3>
+                  <h3>Plain language</h3>
                   <List items={rehearsal.simplerLanguage} />
                 </div>
               </div>
               <h3>Suggested responses</h3>
               <List items={rehearsal.suggestedResponses} />
+              <section className="practice-loop" aria-label="Practice explanation critique">
+                <div>
+                  <span className="section-eyebrow">Practice attempt</span>
+                  <h3>Practice an answer</h3>
+                  <p className="muted">Type an answer to check clarity, tone, age fit, and tradition fit.</p>
+                </div>
+                <label>
+                  Student question
+                  <select value={practiceQuestion} onChange={(event) => setPracticeQuestion(event.target.value)}>
+                    <option value="">Choose a question</option>
+                    {rehearsal.studentQuestions.map((question) => (
+                      <option value={question} key={question}>
+                        {question}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Question
+                  <input value={practiceQuestion} onChange={(event) => setPracticeQuestion(event.target.value)} />
+                </label>
+                <label>
+                  Your answer
+                  <textarea
+                    value={practiceAttempt}
+                    onChange={(event) => setPracticeAttempt(event.target.value)}
+                    rows={4}
+                    placeholder="Write what you would say to the class."
+                  />
+                </label>
+                <button onClick={critiqueRehearsalAttempt} disabled={Boolean(loading) || !practiceQuestion.trim() || !practiceAttempt.trim()}>
+                  {loading === "rehearsal-critique" ? <Loader2 className="spin" size={18} /> : <MessageCircle size={18} />}
+                  Review answer
+                </button>
+                {rehearsalCritique && (
+                  <div className="critique-result">
+                    <span className="section-eyebrow">Answer review</span>
+                    <h3>{rehearsalCritique.summary}</h3>
+                    <div className="two-col">
+                      <div>
+                        <strong>Strengths</strong>
+                        <List items={rehearsalCritique.strengths} />
+                      </div>
+                      <div>
+                        <strong>Clarity</strong>
+                        <List items={rehearsalCritique.clarityNotes} />
+                      </div>
+                      <div>
+                        <strong>Tone and age fit</strong>
+                        <List items={rehearsalCritique.toneAndAgeFitNotes} />
+                      </div>
+                      <div>
+                        <strong>Tradition fit</strong>
+                        <List items={rehearsalCritique.traditionCautionNotes} />
+                      </div>
+                    </div>
+                    <div className="suggested-revision">
+                      <strong>Suggested version</strong>
+                      <p>{rehearsalCritique.suggestedRevision}</p>
+                    </div>
+                    <p className="muted">{rehearsalCritique.nextPracticePrompt}</p>
+                  </div>
+                )}
+              </section>
               <div className="inline-actions">
-                <button onClick={generateLesson} disabled={Boolean(loading)} className="primary">
+                <button onClick={generateLesson} disabled={Boolean(loading) || !brief} className="primary">
                   {loading === "lesson" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
-                  Draft full lesson plan
+                  Create lesson plan
                 </button>
                 <button onClick={seedReflectionFromCurrentPlan} className="quiet-button">
                   <Save size={18} />
-                  Save rehearsal note
+                  Save reflection
                 </button>
               </div>
             </Section>
           )}
 
           {lesson && (
-            <Section
-              title={lesson.title}
-              eyebrow="Full Plan"
-              icon={<BookOpen size={22} />}
-              actions={
-                <>
+            <section className="lesson-document panel" aria-label="Lesson plan draft">
+              <div className="lesson-document-header">
+                <div>
+                  <span className="section-eyebrow">Lesson plan draft</span>
+                  <div className="section-title">
+                    <BookOpen size={22} />
+                    <h2>{lesson.title}</h2>
+                  </div>
+                  <p>Draft for educator review</p>
+                </div>
+                <div className="section-actions">
+                  <button onClick={() => printArtifact("lesson")} className="primary">
+                    <Printer size={18} />
+                    Print / Save as PDF
+                  </button>
                   <button onClick={generateLesson} disabled={Boolean(loading)} className="quiet-button">
                     {loading === "lesson" ? <Loader2 className="spin" size={18} /> : <RefreshCw size={18} />}
-                    Regenerate plan
+                    Revise
                   </button>
-                  <button onClick={seedReflectionFromCurrentPlan} className="primary">
+                  <button onClick={generateVisuals} disabled={Boolean(loading)} className="quiet-button">
+                    {loading === "visuals" ? <Loader2 className="spin" size={18} /> : <Image size={18} />}
+                    Create materials
+                  </button>
+                  <button onClick={generateRehearsal} disabled={Boolean(loading)} className="quiet-button">
+                    {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <Mic size={18} />}
+                    Practice explanation
+                  </button>
+                  <button onClick={seedReflectionFromCurrentPlan} className="quiet-button">
                     <Save size={18} />
-                    Save for reflection
+                    Save reflection
                   </button>
-                </>
-              }
-            >
-              <div className="lesson-overview">
-                <article>
-                  <span>Summary</span>
-                  <p>{lesson.summary}</p>
-                </article>
-                <article>
-                  <span>Tradition note</span>
-                  <p>{lesson.traditionNote}</p>
-                </article>
-                <article>
-                  <span>Real-life application</span>
-                  <p>{lesson.realLifeApplication}</p>
-                </article>
-                <article>
-                  <span>Take-home</span>
-                  <p>{lesson.takeHome}</p>
-                </article>
-              </div>
-
-              {lesson.agentReview && <LessonAgentReviewPanel review={lesson.agentReview} />}
-
-              <div className="two-col">
-                <div>
-                  <h3>Learning objectives</h3>
-                  <List items={lesson.learningObjectives} />
-                </div>
-                <div>
-                  <h3>Teaching anchor</h3>
-                  <p>{lesson.teachingAnchor}</p>
                 </div>
               </div>
 
-              <h3>Lesson flow</h3>
-              <div className="timeline">
-                {lesson.lessonFlow.map((item, index) => (
-                  <article key={`${item.segment}-${index}`}>
-                    <strong>{item.segment}</strong>
-                    <span>{item.duration}</span>
-                    <p>{item.educatorMove}</p>
-                    <p className="muted">{item.studentAction}</p>
-                  </article>
-                ))}
-              </div>
+              <div className="lesson-document-grid">
+                <article className="lesson-draft-body">
+                  <section>
+                    <h3>Overview</h3>
+                    <div className="lesson-overview">
+                      <article>
+                        <span>Summary</span>
+                        <p>{lesson.summary}</p>
+                      </article>
+                      <article>
+                        <span>Tradition note</span>
+                        <p>{lesson.traditionNote}</p>
+                      </article>
+                      <article>
+                        <span>Real-life application</span>
+                        <p>{lesson.realLifeApplication}</p>
+                      </article>
+                      <article>
+                        <span>Take-home</span>
+                        <p>{lesson.takeHome}</p>
+                      </article>
+                    </div>
+                  </section>
 
-              <div className="two-col">
-                <div>
-                  <h3>{lesson.playBasedActivity.name}</h3>
-                  <List items={lesson.playBasedActivity.instructions} />
-                </div>
-                <div>
-                  <h3>Self-directed scaffold</h3>
-                  <p>
-                    <strong>{lesson.selfDirectedLearning.framework}</strong>
-                  </p>
-                  <dl className="scaffold-list">
+                  <section className="two-col">
                     <div>
-                      <dt>I do</dt>
-                      <dd>{lesson.selfDirectedLearning.iDo}</dd>
+                      <h3>Learning objectives</h3>
+                      <List items={lesson.learningObjectives} />
                     </div>
                     <div>
-                      <dt>We do</dt>
-                      <dd>{lesson.selfDirectedLearning.weDo}</dd>
+                      <h3>Teaching anchor</h3>
+                      <p>{lesson.teachingAnchor}</p>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h3>90-minute lesson flow</h3>
+                    <div className="timeline">
+                      {lesson.lessonFlow.map((item, index) => (
+                        <article key={`${item.segment}-${index}`}>
+                          <strong>{item.segment}</strong>
+                          <span>{item.duration}</span>
+                          <p>{item.educatorMove}</p>
+                          <p className="muted">{item.studentAction}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="two-col">
+                    <div>
+                      <h3>{lesson.playBasedActivity.name}</h3>
+                      <List items={lesson.playBasedActivity.instructions} />
                     </div>
                     <div>
-                      <dt>You do</dt>
-                      <dd>{lesson.selfDirectedLearning.youDo}</dd>
+                      <h3>Self-directed scaffold</h3>
+                      <p>
+                        <strong>{lesson.selfDirectedLearning.framework}</strong>
+                      </p>
+                      <dl className="scaffold-list">
+                        <div>
+                          <dt>I do</dt>
+                          <dd>{lesson.selfDirectedLearning.iDo}</dd>
+                        </div>
+                        <div>
+                          <dt>We do</dt>
+                          <dd>{lesson.selfDirectedLearning.weDo}</dd>
+                        </div>
+                        <div>
+                          <dt>You do</dt>
+                          <dd>{lesson.selfDirectedLearning.youDo}</dd>
+                        </div>
+                      </dl>
                     </div>
-                  </dl>
-                </div>
-              </div>
+                  </section>
 
-              <div className="two-col">
-                <div>
-                  <h3>Reflection</h3>
-                  <List items={lesson.reflection} />
-                </div>
-                <div>
-                  <h3>Educator review</h3>
-                  <List items={lesson.reviewNotes} />
-                </div>
+                  <section className="two-col">
+                    <div>
+                      <h3>Reflection</h3>
+                      <List items={lesson.reflection} />
+                    </div>
+                    <div>
+                      <h3>Educator notes</h3>
+                      <List items={lesson.reviewNotes} />
+                    </div>
+                  </section>
+                </article>
+
+                <aside className="lesson-document-aside">
+                  {lesson.agentReview && <LessonQualityGate review={lesson.agentReview} />}
+                </aside>
               </div>
-            </Section>
+            </section>
+          )}
+
+          {(loading === "visuals" || visuals) && (
+            <div className="embedded-output" ref={visualPackRef}>
+              {loading === "visuals" && (
+                <section className="drafting-state inline-draft" aria-live="polite">
+                  <div className="section-title">
+                    <Loader2 className="spin" size={20} />
+                    <h3>Creating materials</h3>
+                  </div>
+                  <p>Creating printable classroom materials for this lesson.</p>
+                  <div className="draft-preview" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </section>
+              )}
+
+              {visuals && (
+                <section className="inline-result visual-pack-printable">
+                  <div className="artifact-heading">
+                    <div className="section-title">
+                      <Image size={20} />
+                      <h3>{visuals.packTitle}</h3>
+                    </div>
+                    <button onClick={() => printArtifact("visuals")} className="quiet-button">
+                      <Printer size={18} />
+                      Print / Save as PDF
+                    </button>
+                  </div>
+                  <p>{visuals.styleGuidance}</p>
+                  <div className="image-prompt">
+                    <p>{visuals.imagePrompt}</p>
+                    <button onClick={generateImage} disabled={Boolean(loading)}>
+                      {loading === "image" ? <Loader2 className="spin" size={18} /> : <PlayCircle size={18} />}
+                      Create image
+                    </button>
+                  </div>
+                  {generatedImage && (
+                    <div className="generated-image">
+                      <img src={generatedImage} alt="Generated lesson visual" />
+                    </div>
+                  )}
+                  <div className="two-col">
+                    <div>
+                      <h3>Scenario cards</h3>
+                      <List items={visuals.scenarioCards} />
+                    </div>
+                    <div>
+                      <h3>Value cards</h3>
+                      <List items={visuals.valueCards} />
+                    </div>
+                  </div>
+                  <h3>Storyboard panels</h3>
+                  <div className="cards-grid">
+                    {visuals.storyboardPanels.map((panel, index) => (
+                      <article key={`${panel.panel}-${index}`}>
+                        <strong>{panel.panel}</strong>
+                        <p>{panel.caption}</p>
+                        <span>{panel.studentPrompt}</span>
+                      </article>
+                    ))}
+                  </div>
+                  <h3>Worksheet prompts</h3>
+                  <List items={visuals.worksheetPrompts} />
+                </section>
+              )}
+            </div>
           )}
 
           {realtimeStatus === "idle" && (lesson || showLessonMemory || reflections.length > 0) && (
             <Section
-              title="Log lesson reflections"
+              title="Save reflection"
               eyebrow="Reflection"
               icon={<NotebookPen size={22} />}
               actions={<span className="saved-count">{reflections.length} saved</span>}
             >
               <p className="muted">
-                Save what happened after class. Recent reflections are included in future planning context.
+                Save what happened after class. Reflections can guide future plans.
               </p>
+
+              {reflections.length > 0 && (
+                <section className={`classroom-evidence ${synthesisStale ? "stale" : ""}`} aria-label="Classroom evidence memory">
+                  <div className="artifact-heading">
+                    <div>
+                      <span className="section-eyebrow">Classroom evidence</span>
+                      <h3>{reflectionSynthesis ? "Reflection summary" : "No summary yet"}</h3>
+                    </div>
+                    <button onClick={synthesizeReflectionMemory} disabled={Boolean(loading)}>
+                      {loading === "reflection-synthesis" ? <Loader2 className="spin" size={18} /> : <Wand2 size={18} />}
+                      {reflectionSynthesis ? "Update summary" : "Summarize reflections"}
+                    </button>
+                  </div>
+                  {reflectionSynthesis ? (
+                    <>
+                      {synthesisStale && <p className="muted">Reflections changed after this synthesis. Regenerate when ready.</p>}
+                      <p>{reflectionSynthesis.summary}</p>
+                      <div className="evidence-grid">
+                        <div>
+                          <strong>Carry forward</strong>
+                          <List items={reflectionSynthesis.workedWellPatterns} />
+                        </div>
+                        <div>
+                          <strong>Adjust or avoid</strong>
+                          <List items={reflectionSynthesis.avoidOrAdjustPatterns} />
+                        </div>
+                        <div>
+                          <strong>Student response</strong>
+                          <List items={reflectionSynthesis.studentResponseThemes} />
+                        </div>
+                        <div>
+                          <strong>Next-time guidance</strong>
+                          <List items={reflectionSynthesis.nextTimeGuidance} />
+                        </div>
+                      </div>
+                      {reflectionSynthesis.cautionNotes.length > 0 && (
+                        <div className="suggested-revision">
+                          <strong>Cautions</strong>
+                          <List items={reflectionSynthesis.cautionNotes} />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="muted">Summarize saved reflections into planning evidence.</p>
+                  )}
+                </section>
+              )}
 
               <div className="inline-actions">
                 <button className="primary" onClick={() => setShowLessonMemory((current) => !current)}>
                   <NotebookPen size={18} />
-                  {showLessonMemory ? "Hide reflection form" : "Log reflection"}
+                  {showLessonMemory ? "Hide form" : "Add reflection"}
                 </button>
                 {(brief || lesson) && (
                   <button className="quiet-button" onClick={seedReflectionFromCurrentPlan}>
                     <Save size={18} />
-                    Use current plan
+                    Use this plan
                   </button>
                 )}
               </div>
@@ -1676,12 +2263,12 @@ export default function App() {
 
                   <label>
                     <FileText size={16} />
-                    Lesson plan used
+                    Plan used
                     <textarea
                       value={reflectionDraft.lessonPlan}
                       onChange={(event) => updateReflectionDraft("lessonPlan", event.target.value)}
                       rows={3}
-                      placeholder="Name the plan, activity flow, or teaching approach that was actually used."
+                      placeholder="Name the plan or activity flow used."
                     />
                   </label>
 
@@ -1698,12 +2285,12 @@ export default function App() {
                     </label>
                     <label>
                       <MessageCircle size={16} />
-                      What did not work
+                      What to adjust
                       <textarea
                         value={reflectionDraft.didNotWork}
                         onChange={(event) => updateReflectionDraft("didNotWork", event.target.value)}
                         rows={4}
-                        placeholder="Example: The story introduction was too long and students got restless."
+                        placeholder="Example: The story introduction was too long."
                       />
                     </label>
                   </div>
@@ -1716,7 +2303,7 @@ export default function App() {
                         value={reflectionDraft.studentResponse}
                         onChange={(event) => updateReflectionDraft("studentResponse", event.target.value)}
                         rows={4}
-                        placeholder="What did students understand, resist, enjoy, or ask about?"
+                        placeholder="What did students understand, resist, enjoy, or ask?"
                       />
                     </label>
                     <label>
@@ -1726,7 +2313,7 @@ export default function App() {
                         value={reflectionDraft.nextTime}
                         onChange={(event) => updateReflectionDraft("nextTime", event.target.value)}
                         rows={4}
-                        placeholder="What should the next lesson repeat, avoid, deepen, or follow up on?"
+                        placeholder="What should the next lesson repeat, avoid, or deepen?"
                       />
                     </label>
                   </div>
@@ -1777,71 +2364,6 @@ export default function App() {
         </div>
           </section>
 
-          {showPlanningShortcuts && (
-            <aside className="context-panel" aria-label="Planning shortcuts">
-              <section className="context-card">
-                <div className="context-card-head">
-                  <div className="section-title compact">
-                    <NotebookPen size={20} />
-                    <h2>Lesson memory</h2>
-                  </div>
-                  <span>{reflections.length}</span>
-                </div>
-                <p>Recent reflections become classroom evidence for the next plan.</p>
-                <button className="context-action" onClick={() => setShowLessonMemory((current) => !current)}>
-                  <Save size={18} />
-                  {showLessonMemory ? "Hide memory form" : "Log reflection"}
-                </button>
-              </section>
-
-              <section className="context-card">
-                <div className="context-card-head">
-                  <div className="section-title compact">
-                    <Mic size={20} />
-                    <h2>Rehearse</h2>
-                  </div>
-                  <span>{rehearsal ? "Ready" : "Next"}</span>
-                </div>
-                <p>Practice likely student questions before turning the brief into a full plan.</p>
-                <button className="context-action" onClick={generateRehearsal} disabled={Boolean(loading) || !hasPlanContext}>
-                  {loading === "rehearsal" ? <Loader2 className="spin" size={18} /> : <MessageCircle size={18} />}
-                  Start rehearsal
-                </button>
-              </section>
-
-              <section className="context-card">
-                <div className="context-card-head">
-                  <div className="section-title compact">
-                    <CheckCircle2 size={20} />
-                    <h2>Next actions</h2>
-                  </div>
-                </div>
-                <div className="next-action-list">
-                  <button onClick={generateBrief} disabled={Boolean(loading) || selectedOptionIndex === null}>
-                    <FileText size={18} />
-                    <span>
-                      <strong>Draft brief</strong>
-                      <small>{brief ? "Refresh the current brief" : "Use the selected option"}</small>
-                    </span>
-                  </button>
-                  <button onClick={generateLesson} disabled={Boolean(loading) || !brief}>
-                    <BookOpen size={18} />
-                    <span>
-                      <strong>Draft full plan</strong>
-                      <small>Create the 90-minute lesson</small>
-                    </span>
-                  </button>
-                  <button onClick={generateVisuals} disabled={Boolean(loading) || !brief}>
-                    <Image size={18} />
-                    <span>
-                      <strong>Create visuals</strong>
-                      <small>Cards, prompts, and image direction</small>
-                    </span>
-                  </button>
-                </div>
-              </section>
-            </aside>
-          )}
         </div>
       </div>
     </main>

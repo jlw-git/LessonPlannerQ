@@ -36,6 +36,8 @@ The runner requires `OPENAI_API_KEY` when it starts the API itself. Results are 
 - Reflection memory: lesson plans should visibly use prior classroom evidence when provided.
 - Visual review: visual packs should include culturally careful review notes, especially around sacred figures.
 - Rehearsal coaching: difficult questions should receive simple, respectful educator-facing responses.
+- Rehearsal critique: typed educator attempts should receive clarity, tone, age-fit, and tradition-caution feedback.
+- Reflection synthesis: saved reflections should become inspectable classroom evidence without replacing raw notes.
 - Interview extraction: voice transcripts should become editable planning fields with educator-review notes before generation.
 - Brief agent review: initial briefs and brief updates should return structured `agentReview` notes with pedagogy and tradition-review signals.
 - Option agent review: option sets should return structured `optionReview` notes with pedagogy and tradition-review signals.
