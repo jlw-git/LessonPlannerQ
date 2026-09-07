@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  ArrowRight,
   BookOpen,
   CalendarDays,
   ChevronDown,
@@ -19,6 +20,7 @@ import {
   RefreshCw,
   Save,
   Target,
+  Users,
   Trash2,
   Volume2,
   VolumeX,
@@ -95,6 +97,30 @@ const initialForm: FormState = {
   lessonObjectives: "",
   planningRequirements: ""
 };
+
+const lessonStarters: (FormState & { label: string; hint: string })[] = [
+  {
+    label: "Compassion in everyday choices",
+    hint: "Explore a school-day dilemma",
+    topic: "Compassion in everyday choices",
+    lessonObjectives: "Students can notice when someone needs care and rehearse a compassionate response to a school-day dilemma.",
+    planningRequirements: "Use a short role-play and guided reflection. Connect the activity to our Chinese Mahayana folk Buddhist teaching context."
+  },
+  {
+    label: "Gratitude beyond saying thank you",
+    hint: "Turn appreciation into action",
+    topic: "Gratitude in everyday life",
+    lessonObjectives: "Students can recognise the care they receive and choose one practical way to express gratitude.",
+    planningRequirements: "Use simple paper-based activities and familiar examples from home or the temple. Model an example before students work in pairs."
+  },
+  {
+    label: "A pause before reacting",
+    hint: "Practice a more thoughtful response",
+    topic: "Mindful responses to frustration",
+    lessonObjectives: "Students can notice frustration, pause, and practice a thoughtful response in an everyday disagreement.",
+    planningRequirements: "Keep explanations short. Use a guided demonstration, a shared rehearsal, then a paired scenario. Connect the practice to our Chinese Mahayana folk Buddhist context."
+  }
+];
 
 function todayString() {
   const now = new Date();
@@ -368,27 +394,22 @@ function AgentReviewPanel({
   review,
   title,
   ariaLabel,
-  noRevisionCopy
+  noRevisionCopy,
+  compact = false
 }: {
   review: BriefAgentReview | LessonAgentReview | OptionAgentReview;
   title: string;
   ariaLabel: string;
   noRevisionCopy: string;
+  compact?: boolean;
 }) {
   const revisionItems =
     review.revisionRequired && review.revisionRequests.length > 0
       ? review.revisionRequests
       : [noRevisionCopy];
 
-  return (
-    <aside className="agent-review-panel" aria-label={ariaLabel}>
-      <div className="agent-review-heading">
-        <AlertCircle size={20} />
-        <div>
-          <span>{title}</span>
-          <p>{review.summary}</p>
-        </div>
-      </div>
+  const details = (
+    <>
       <div className="agent-review-grid">
         <div>
           <strong>Strengths</strong>
@@ -413,6 +434,35 @@ function AgentReviewPanel({
           <List items={review.educatorReviewNotes} />
         </div>
       )}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <details className="agent-review-panel compact-review" aria-label={ariaLabel} open={review.revisionRequired}>
+        <summary className="agent-review-heading">
+          <AlertCircle size={20} />
+          <div>
+            <span>{title}</span>
+            <p>{review.summary}</p>
+          </div>
+          <ChevronDown className="agent-review-toggle" size={18} aria-hidden="true" />
+        </summary>
+        {details}
+      </details>
+    );
+  }
+
+  return (
+    <aside className="agent-review-panel" aria-label={ariaLabel}>
+      <div className="agent-review-heading">
+        <AlertCircle size={20} />
+        <div>
+          <span>{title}</span>
+          <p>{review.summary}</p>
+        </div>
+      </div>
+      {details}
     </aside>
   );
 }
@@ -435,6 +485,7 @@ function OptionAgentReviewPanel({ review }: { review: OptionAgentReview }) {
       title="Option review"
       ariaLabel="Option review"
       noRevisionCopy="No required revision."
+      compact
     />
   );
 }
@@ -460,7 +511,7 @@ function LessonQualityGate({ review }: { review: LessonAgentReview }) {
         <CheckCircle2 size={20} />
         <div>
           <span>Quality check</span>
-          <strong>{review.revisionRequired ? "Needs educator attention" : "Passed with educator review"}</strong>
+          <strong>{review.revisionRequired ? "Needs educator attention" : "Ready for your review"}</strong>
           <p>{review.summary}</p>
         </div>
       </div>
@@ -527,16 +578,28 @@ function InterviewExtractionReview({
         Planning requirements
         <textarea value={draft.planningRequirements} onChange={(event) => onUpdate("planningRequirements", event.target.value)} rows={4} />
       </label>
-      <div className="interview-review-grid">
-        <div>
-          <strong>Open questions</strong>
-          <List items={draft.openQuestions.length > 0 ? draft.openQuestions : ["No open questions found."]} />
-        </div>
-        <div>
-          <strong>Confidence</strong>
-          <List items={draft.confidenceNotes.length > 0 ? draft.confidenceNotes : ["No additional confidence concerns."]} />
-        </div>
-      </div>
+      {draft.openQuestions.length > 0 && (
+        <aside className="review-attention" aria-label="Open questions to review">
+          <div>
+            <AlertCircle size={19} />
+            <div>
+              <strong>Check these before you continue</strong>
+              <p>They may change the lesson direction or classroom fit.</p>
+            </div>
+          </div>
+          <List items={draft.openQuestions} />
+        </aside>
+      )}
+      <details className="inference-details">
+        <summary>
+          <div>
+            <strong>Conversation notes</strong>
+            <small>{draft.confidenceNotes.length > 0 ? "Review what may need a second look" : "No additional notes to review"}</small>
+          </div>
+          <ChevronDown size={18} aria-hidden="true" />
+        </summary>
+        <List items={draft.confidenceNotes.length > 0 ? draft.confidenceNotes : ["No additional confidence concerns."]} />
+      </details>
       <div className="inline-actions">
         <button onClick={onApply} className="primary">
           <CheckCircle2 size={18} />
@@ -568,17 +631,17 @@ function LessonRequirementsReady({
       <div className="typed-fallback-fields">
         <label>
           Topic
-          <input value={form.topic} onChange={(event) => onUpdate("topic", event.target.value)} />
+          <input value={form.topic} onChange={(event) => onUpdate("topic", event.target.value)} disabled={Boolean(loading)} />
         </label>
         <label>
           <Target size={16} />
           Learning goals
-          <textarea value={form.lessonObjectives} onChange={(event) => onUpdate("lessonObjectives", event.target.value)} rows={2} />
+          <textarea value={form.lessonObjectives} onChange={(event) => onUpdate("lessonObjectives", event.target.value)} rows={2} disabled={Boolean(loading)} />
         </label>
         <label>
           <MessageCircle size={16} />
           Constraints
-          <textarea value={form.planningRequirements} onChange={(event) => onUpdate("planningRequirements", event.target.value)} rows={3} />
+          <textarea value={form.planningRequirements} onChange={(event) => onUpdate("planningRequirements", event.target.value)} rows={3} disabled={Boolean(loading)} />
         </label>
       </div>
       <div className="inline-actions">
@@ -588,6 +651,45 @@ function LessonRequirementsReady({
         </button>
       </div>
     </section>
+  );
+}
+
+function FreshStartPrompt({ onConfirm, onDismiss, busy }: { onConfirm: () => void; onDismiss: () => void; busy: boolean }) {
+  return (
+    <section className="fresh-start-prompt" aria-label="Start another lesson">
+      <div>
+        <span className="section-eyebrow">New lesson</span>
+        <h2>Start a fresh draft?</h2>
+        <p>This clears the current requirements and lesson draft. Saved reflections stay available for the next plan.</p>
+      </div>
+      <div className="inline-actions">
+        <button onClick={onDismiss} className="quiet-button">
+          Keep current lesson
+        </button>
+        <button onClick={onConfirm} className="primary" disabled={busy}>
+          <RefreshCw size={18} />
+          Start fresh
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function ArtifactStage({ id, summary, completed, children }: {
+  id: string;
+  summary: string;
+  completed: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div id={id} className="artifact-stage" tabIndex={-1}>
+      {completed ? (
+        <details className="completed-stage">
+          <summary><CheckCircle2 size={18} /><span>{summary}</span><span className="stage-revisit">Revisit</span><ChevronDown size={17} /></summary>
+          {children}
+        </details>
+      ) : children}
+    </div>
   );
 }
 
@@ -625,7 +727,7 @@ function WorkflowRail({ steps }: { steps: FlowStep[] }) {
   return (
     <nav className="workflow-rail" aria-label="Planning workflow">
       {steps.map((step, index) => (
-        <div className={`workflow-step ${step.status}`} key={step.label}>
+        <div className={`workflow-step ${step.status}`} key={step.label} aria-current={step.status === "active" ? "step" : undefined}>
           <span className="workflow-marker">
             {step.status === "done" ? <CheckCircle2 size={16} /> : step.status === "active" ? index + 1 : <Circle size={13} />}
           </span>
@@ -708,7 +810,12 @@ export default function App() {
   const [interviewDraft, setInterviewDraft] = useState<InterviewExtraction | null>(null);
   const [approvedInterviewDraft, setApprovedInterviewDraft] = useState<InterviewExtraction | null>(null);
   const [interviewApplied, setInterviewApplied] = useState(false);
+  const [showFreshStartPrompt, setShowFreshStartPrompt] = useState(false);
   const [plannerMuted, setPlannerMuted] = useState(false);
+  const [typedOpen, setTypedOpen] = useState(false);
+  const [artifactToFocus, setArtifactToFocus] = useState<string | null>(null);
+  const typedTopicRef = useRef<HTMLInputElement | null>(null);
+  const requestInFlight = useRef(false);
   const realtimePeer = useRef<RTCPeerConnection | null>(null);
   const realtimeStream = useRef<MediaStream | null>(null);
   const realtimeAudio = useRef<HTMLAudioElement | null>(null);
@@ -720,6 +827,14 @@ export default function App() {
   const interviewReviewRef = useRef<HTMLElement | null>(null);
   const outputRef = useRef<HTMLDivElement | null>(null);
   const visualPackRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!artifactToFocus) return;
+    const artifact = document.getElementById(artifactToFocus);
+    artifact?.focus({ preventScroll: true });
+    artifact?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setArtifactToFocus(null);
+  }, [artifactToFocus]);
 
   useEffect(() => {
     const cleaned = cleanTranscriptEntries(transcript).map((entry) => ({ ...entry, status: "final" as const }));
@@ -743,6 +858,16 @@ export default function App() {
   const selectedOption = selectedOptionIndex === null ? null : lessonOptions[selectedOptionIndex] ?? null;
   const hasTypedBrief = Boolean(form.topic.trim() || form.lessonObjectives.trim() || form.planningRequirements.trim());
   const hasApprovedVoiceNotes = Boolean(approvedInterviewDraft);
+  const hasResettableDraft =
+    hasTypedBrief ||
+    hasEducatorTranscript ||
+    Boolean(interviewDraft) ||
+    hasApprovedVoiceNotes ||
+    lessonOptions.length > 0 ||
+    Boolean(brief) ||
+    Boolean(lesson) ||
+    Boolean(visuals) ||
+    Boolean(rehearsal);
   const workflowStage: WorkflowStage = showLessonMemory
     ? "reflect"
     : lesson
@@ -770,12 +895,12 @@ export default function App() {
 
   const workflowSteps: FlowStep[] = [
     {
-      label: "Capture",
+      label: "Your idea",
       detail: realtimeStatus !== "idle" ? "Captions live" : hasTypedBrief || hasEducatorTranscript ? "Context captured" : "Capture requirements",
       status: workflowStage === "capture" ? "active" : "done"
     },
     {
-      label: "Review",
+      label: "Requirements",
       detail: hasApprovedVoiceNotes ? "Requirements approved" : interviewDraft ? "Review requirements" : "Confirm context",
       status: workflowStage === "review" ? "active" : hasApprovedVoiceNotes || lessonOptions.length > 0 || brief || lesson ? "done" : "idle"
     },
@@ -856,9 +981,34 @@ export default function App() {
     setBrief(null);
     setLesson(null);
     setVisuals(null);
-    setRehearsal(null);
     setGeneratedImage(null);
+    setRehearsal(null);
+    setRehearsalCritique(null);
+    setPracticeAttempt("");
     setFeedback("");
+  };
+
+  const startFreshLesson = () => {
+    if (requestInFlight.current) return;
+    clearGeneratedArtifacts();
+    setForm(initialForm);
+    setPracticeQuestion("");
+    setPracticeAttempt("");
+    setRehearsalCritique(null);
+    setTranscript([]);
+    setTranscriptCopied(false);
+    setInterviewDraft(null);
+    setApprovedInterviewDraft(null);
+    setInterviewApplied(false);
+    setVoiceSignal("idle");
+    setPlannerMuted(false);
+    setShowLessonMemory(false);
+    setEditingReflectionId(null);
+    setReflectionDraft({ ...initialReflectionDraft, date: todayString() });
+    setError(null);
+    setShowFreshStartPrompt(false);
+    setTypedOpen(false);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const updateReflectionDraft = (field: keyof ReflectionDraft, value: string) => {
@@ -962,14 +1112,23 @@ export default function App() {
     action: () => Promise<T>,
     onSuccess: (value: T) => void
   ) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     setLoading(key);
     setError(null);
     try {
       const result = await action();
       onSuccess(result);
+      const artifactId: Record<string, string> = {
+        options: "options-stage", brief: "outline-stage", "brief-update": "outline-stage", lesson: "lesson-stage"
+      };
+      if (artifactId[key]) {
+        setArtifactToFocus(artifactId[key]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
+      requestInFlight.current = false;
       setLoading(null);
     }
   };
@@ -987,7 +1146,10 @@ export default function App() {
     setBrief(null);
     setLesson(null);
     setVisuals(null);
+    setGeneratedImage(null);
     setRehearsal(null);
+    setRehearsalCritique(null);
+    setPracticeAttempt("");
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     return run("brief", () => postJson<LessonBrief>("/api/brief", requestPayload), (nextBrief) => {
       setBrief(nextBrief);
@@ -1003,7 +1165,10 @@ export default function App() {
     setBrief(null);
     setLesson(null);
     setVisuals(null);
+    setGeneratedImage(null);
     setRehearsal(null);
+    setRehearsalCritique(null);
+    setPracticeAttempt("");
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (metricCount("planning_started") === 0) {
       trackMetric("planning_started", "typed or approved notes");
@@ -1072,12 +1237,16 @@ export default function App() {
   };
 
   const selectOption = (index: number) => {
+    if (requestInFlight.current || selectedOptionIndex === index) return;
     setSelectedOptionIndex(index);
     setExpandedOptionIndex(index);
     setBrief(null);
     setLesson(null);
     setVisuals(null);
+    setGeneratedImage(null);
     setRehearsal(null);
+    setRehearsalCritique(null);
+    setPracticeAttempt("");
     trackMetric("option_selected", `Option ${index + 1}`);
   };
 
@@ -1090,7 +1259,10 @@ export default function App() {
             setBrief(updatedBrief);
             setLesson(null);
             setVisuals(null);
+            setGeneratedImage(null);
             setRehearsal(null);
+            setRehearsalCritique(null);
+            setPracticeAttempt("");
             setFeedback("");
             trackMetric("brief_refined", updatedBrief.title);
           }
@@ -1099,6 +1271,11 @@ export default function App() {
 
   const generateLesson = () => {
     setLesson(null);
+    setVisuals(null);
+    setGeneratedImage(null);
+    setRehearsal(null);
+    setRehearsalCritique(null);
+    setPracticeAttempt("");
     outputRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     return run("lesson", () => postJson<LessonPlan>("/api/lesson", { ...requestPayload, brief }), (nextLesson) => {
       setLesson(nextLesson);
@@ -1108,6 +1285,7 @@ export default function App() {
 
   const generateVisuals = () => {
     setVisuals(null);
+    setGeneratedImage(null);
     window.setTimeout(() => visualPackRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
     return run("visuals", () => postJson<VisualPack>("/api/visuals", { ...requestPayload, brief, lesson }), (nextVisuals) => {
       setVisuals(nextVisuals);
@@ -1461,7 +1639,7 @@ export default function App() {
     !interviewDraft &&
     !hasEducatorTranscript &&
     !hasApprovedVoiceNotes;
-  const showWorkflowRail =
+  const showWorkflowRail = !showStartComposer && (
     realtimeStatus !== "idle" ||
     hasTypedBrief ||
     hasEducatorTranscript ||
@@ -1473,56 +1651,107 @@ export default function App() {
     Boolean(rehearsal) ||
     Boolean(visuals) ||
     showLessonMemory ||
-    reflections.length > 0;
+    reflections.length > 0);
+
+  const useStarter = (starter: FormState) => {
+    if (loading || hasTypedBrief) return;
+    setForm({ topic: starter.topic, lessonObjectives: starter.lessonObjectives, planningRequirements: starter.planningRequirements });
+    setTypedOpen(true);
+    window.setTimeout(() => typedTopicRef.current?.focus(), 0);
+  };
 
   return (
-    <main className={`app-shell ${showWorkflowRail ? "with-workflow" : "without-workflow"}`}>
-      <aside className="app-sidebar">
+    <main className={`app-shell teaching-workspace ${showWorkflowRail ? "with-workflow" : "without-workflow"}`}>
+      <a className="skip-link" href="#planning-content">Skip to lesson planning</a>
+      <header className="app-sidebar">
         <div className="brand-lockup">
           <span className="brand-mark">
             <BookOpen size={22} />
           </span>
-          <strong>Lesson Planner Q</strong>
+          <div><strong>PlannerQ</strong><span className="brand-caption">A little preparation. A meaningful lesson.</span></div>
         </div>
-        {showWorkflowRail && <WorkflowRail steps={workflowSteps} />}
         <div className="sidebar-footer">
-          <span>Educator workspace</span>
-          <strong>{reflections.length} saved reflections</strong>
+          {reflections.length > 0 ? (
+            <button className="quiet-button" onClick={() => {
+              setShowLessonMemory((current) => !current);
+              if (!showLessonMemory) window.setTimeout(() => document.getElementById("reflection-workspace")?.scrollIntoView({ behavior: "smooth" }), 0);
+            }}><NotebookPen size={17} />{showLessonMemory ? "Close reflections" : `Class reflections (${reflections.length})`}</button>
+          ) : <span>Made for educators</span>}
         </div>
-      </aside>
+      </header>
 
-      <div className="planner-workspace">
+      <div className="planner-workspace" id="planning-content" tabIndex={-1}>
+        {showWorkflowRail && <WorkflowRail steps={workflowSteps} />}
         <div className="planner-grid solo">
           <section className="planner-main">
+
+        {realtimeStatus === "idle" && hasResettableDraft && (
+          showFreshStartPrompt ? (
+            <FreshStartPrompt onConfirm={startFreshLesson} onDismiss={() => setShowFreshStartPrompt(false)} busy={Boolean(loading)} />
+          ) : (
+            <div className="fresh-start-action">
+              <button onClick={() => setShowFreshStartPrompt(true)} className="quiet-button" disabled={Boolean(loading)}>
+                <RefreshCw size={17} />
+                Start another lesson
+              </button>
+            </div>
+          )
+        )}
 
         {showStartComposer && (
           <section className="brief-composer feature-section" aria-label="Start lesson plan">
             <div className="composer-head">
-              <div className="section-title">
-                <NotebookPen size={22} />
-                <h2>New lesson plan</h2>
-              </div>
-              <p>Share the topic, objectives, student needs, timing, and constraints.</p>
+              <span className="section-eyebrow">Your next lesson starts here</span>
+              <h1>What will you teach next?</h1>
+              <p>Turn a rough idea into a thoughtful lesson you feel ready to lead.</p>
             </div>
 
+            <div className="planning-context" aria-label="Default lesson context">
+              <span className="tradition-context"><BookOpen size={15} />Chinese Mahayana folk Buddhist education</span>
+              <span>
+                <CalendarDays size={15} />
+                90 minutes
+              </span>
+              <span>
+                <Users size={15} />
+                4 students · Age 13
+              </span>
+            </div>
+
+            <div className="entry-layout">
             <div className="start-stack">
               <section className={`voice-primary-card mic-cta ${voiceSignal.includes("error") ? "has-error" : ""}`} aria-label="Voice planning">
+                <div className="voice-cta-copy">
+                  <span className="voice-cta-icon" aria-hidden="true"><Mic size={27} /></span>
+                  <div>
+                    <h2>Let’s talk about your lesson.</h2>
+                    <p>Share your topic, what students should learn, and what your class needs. Include timing and any limits.</p>
+                  </div>
+                </div>
                 <button onClick={startRealtime} className="primary voice-start-button" disabled={Boolean(loading)}>
                   <Mic size={18} />
                   Talk about it
+                  <ArrowRight size={18} />
                 </button>
+                <p className="voice-review-note">You’ll review your requirements before creating options.</p>
               </section>
 
-              <details className="typed-brief secondary-brief-card">
+              <details className="typed-brief secondary-brief-card" open={typedOpen} onToggle={(event) => setTypedOpen(event.currentTarget.open)}>
                 <summary>
                   <FileText size={18} />
-                  <span>Type it out</span>
+                  <span>
+                    <strong>Type it out</strong>
+                    <small>Your ideas, in your own words.</small>
+                  </span>
+                  <ChevronDown size={18} className="typed-chevron" />
                 </summary>
 
                 <div className="typed-fallback-fields">
                   <label>
                     Topic
                     <input
+                      ref={typedTopicRef}
+                      disabled={Boolean(loading)}
                       value={form.topic}
                       onChange={(event) => update("topic", event.target.value)}
                       placeholder="Example: compassion in daily life"
@@ -1533,6 +1762,7 @@ export default function App() {
                     <Target size={16} />
                     Learning goals
                     <textarea
+                      disabled={Boolean(loading)}
                       value={form.lessonObjectives}
                       onChange={(event) => update("lessonObjectives", event.target.value)}
                       rows={2}
@@ -1542,8 +1772,9 @@ export default function App() {
 
                   <label>
                     <MessageCircle size={16} />
-                    Constraints
+                    Your class and practical needs
                     <textarea
+                      disabled={Boolean(loading)}
                       value={form.planningRequirements}
                       onChange={(event) => update("planningRequirements", event.target.value)}
                       rows={3}
@@ -1554,11 +1785,32 @@ export default function App() {
                   <div className="typed-actions">
                     <button onClick={generateOptions} disabled={Boolean(loading) || !hasTypedBrief} className="primary">
                       {loading === "options" ? <Loader2 className="spin" size={18} /> : <FileText size={18} />}
-                      {lessonOptions.length > 0 ? "Regenerate options" : "Create options"}
+                      Create three approaches
                     </button>
                   </div>
                 </div>
               </details>
+            </div>
+            <aside className="lesson-starters" aria-label="Lesson starting points">
+              <span className="section-eyebrow">A little inspiration</span>
+              <h2>Start with an everyday moment.</h2>
+              <p>Choose an idea to make your own.</p>
+              <div className="starter-list">
+                {lessonStarters.map((starter, index) => (
+                  <button key={starter.label} onClick={() => useStarter(starter)} disabled={Boolean(loading) || hasTypedBrief}>
+                    <span className="starter-number">0{index + 1}</span>
+                    <span><strong>{starter.label}</strong><small>{starter.hint}</small></span>
+                    <ArrowRight size={17} />
+                  </button>
+                ))}
+              </div>
+              <span className="starter-footnote">Starting ideas, ready for your changes.</span>
+            </aside>
+            </div>
+            <div className="entry-outcomes" aria-label="What you can prepare">
+              <span><FileText size={17} />A plan you can teach</span>
+              <span><MessageCircle size={17} />Explanations you can practice</span>
+              <span><NotebookPen size={17} />Reflections for next time</span>
             </div>
           </section>
         )}
@@ -1576,18 +1828,18 @@ export default function App() {
         )}
 
         {realtimeStatus !== "idle" && (
-          <section className="voice-stage" aria-live="polite">
+          <section className="voice-stage" aria-label="Voice planning conversation">
             <div className="voice-stage-top">
-              <span>Live captions</span>
+              <span>Voice planning</span>
               <strong>{realtimeStatus === "connecting" ? "Connecting" : "Listening"}</strong>
             </div>
 
             <div className="conversation-shell">
               <div className="voice-stage-center">
-                <button onClick={startRealtime} className="stage-mic" aria-label="End voice planning">
+                <div className="stage-mic" aria-hidden="true">
                   <Mic size={24} />
-                </button>
-                <p>{realtimeStatus === "connecting" ? "Connecting" : "Listening"}</p>
+                </div>
+                <p>{realtimeStatus === "connecting" ? "Connecting your conversation" : "Go ahead — PlannerQ is listening"}</p>
                 <button
                   aria-pressed={plannerMuted}
                   className="quiet-button compact-button mute-output-button"
@@ -1597,13 +1849,13 @@ export default function App() {
                   {plannerMuted ? "Unmute PlannerQ" : "Mute PlannerQ"}
                 </button>
                 <button onClick={stopRealtime} className="end-session">
-                  End
+                  Finish conversation
                 </button>
               </div>
 
               <aside className="transcript-drawer">
                 <div className="transcript-head">
-                  <h2>Live captions</h2>
+                  <h2>Conversation notes</h2>
                 </div>
                 <div className="transcript-log" ref={transcriptRef} aria-live="polite" aria-relevant="additions text">
                   {transcript.length === 0 ? (
@@ -1689,6 +1941,7 @@ export default function App() {
           )}
 
           {lessonOptions.length > 0 && (
+            <ArtifactStage id="options-stage" summary={`Approach: ${selectedOption?.title || "Compare your options"}`} completed={Boolean(brief || lesson)}>
             <Section
               title="Choose an approach"
               eyebrow="Options"
@@ -1700,7 +1953,7 @@ export default function App() {
                 </button>
               }
             >
-              <p className="muted">Select one approach before creating the lesson outline.</p>
+              <p className="muted">Compare the tradeoffs, then choose one direction to turn into an editable outline.</p>
               {optionReview && <OptionAgentReviewPanel review={optionReview} />}
               <div className="option-picker">
                 {lessonOptions.map((option, index) => {
@@ -1738,9 +1991,9 @@ export default function App() {
                         {option.activities.length > 2 && <span>+{option.activities.length - 2} more</span>}
                       </div>
                       <div className="option-card-actions">
-                        <button onClick={() => selectOption(index)}>
+                        <button onClick={() => selectOption(index)} aria-pressed={isSelected} disabled={Boolean(loading)}>
                           {isSelected ? <CheckCircle2 size={18} /> : <FileText size={18} />}
-                          {isSelected ? "Selected" : "Use this"}
+                          {isSelected ? "Selected approach" : "Choose this approach"}
                         </button>
                         {isSelected && (
                           <button onClick={generateBrief} disabled={Boolean(loading)} className="primary">
@@ -1791,9 +2044,11 @@ export default function App() {
                 })}
               </div>
             </Section>
+            </ArtifactStage>
           )}
 
           {brief && (
+            <ArtifactStage id="outline-stage" summary={`Outline: ${brief.title}`} completed={Boolean(lesson)}>
             <Section
               title={brief.title}
               eyebrow="Lesson outline"
@@ -1844,6 +2099,7 @@ export default function App() {
                 </button>
               </div>
             </Section>
+            </ArtifactStage>
           )}
 
           {loading === "rehearsal" && (
@@ -1961,7 +2217,7 @@ export default function App() {
           )}
 
           {lesson && (
-            <section className="lesson-document panel" aria-label="Lesson plan draft">
+            <section id="lesson-stage" tabIndex={-1} className="lesson-document panel" aria-label="Lesson plan draft">
               <div className="lesson-document-header">
                 <div>
                   <span className="section-eyebrow">Lesson plan draft</span>
@@ -1978,7 +2234,7 @@ export default function App() {
                   </button>
                   <button onClick={generateLesson} disabled={Boolean(loading)} className="quiet-button">
                     {loading === "lesson" ? <Loader2 className="spin" size={18} /> : <RefreshCw size={18} />}
-                    Revise
+                    Regenerate
                   </button>
                   <button onClick={generateVisuals} disabled={Boolean(loading)} className="quiet-button">
                     {loading === "visuals" ? <Loader2 className="spin" size={18} /> : <Image size={18} />}
@@ -2031,7 +2287,7 @@ export default function App() {
                   </section>
 
                   <section>
-                    <h3>90-minute lesson flow</h3>
+                    <h3>Lesson flow</h3>
                     <div className="timeline">
                       {lesson.lessonFlow.map((item, index) => (
                         <article key={`${item.segment}-${index}`}>
@@ -2159,7 +2415,8 @@ export default function App() {
             </div>
           )}
 
-          {realtimeStatus === "idle" && (lesson || showLessonMemory || reflections.length > 0) && (
+          {realtimeStatus === "idle" && (lesson || showLessonMemory) && (
+            <div id="reflection-workspace">
             <Section
               title="Save reflection"
               eyebrow="Reflection"
@@ -2167,7 +2424,7 @@ export default function App() {
               actions={<span className="saved-count">{reflections.length} saved</span>}
             >
               <p className="muted">
-                Save what happened after class. Reflections can guide future plans.
+                Save what happened after class. Your five latest reflections help shape future plans. Saved in this browser.
               </p>
 
               {reflections.length > 0 && (
@@ -2359,6 +2616,7 @@ export default function App() {
                 </div>
               )}
             </Section>
+            </div>
           )}
 
         </div>

@@ -1,691 +1,240 @@
 # Product Requirements Document: Lesson Planner Q
 
-Last updated: May 20, 2026
+Last updated: September 7, 2026
 
-## 1. Overview
+## 1. Product Decision And Value Proposition
 
-### Product Name
+Lesson Planner Q helps a volunteer educator turn a rough teaching idea into a lesson they can confidently lead: a reviewed 90-minute draft for a small Chinese Mahayana folk Buddhist class, with practical activities, words to try, and classroom observations to inform next week.
 
-Lesson Planner Q
+The product's unit of value is **a lesson the educator has reviewed and can facilitate**, not the number of generated artifacts. A faster draft is useful only if the educator spends less total effort adapting it and still trusts its classroom and tradition fit. Preparation-time savings and increased confidence are hypotheses to validate, not established product claims.
 
-Primary user-facing surface: Weekly Lesson Planner
+The initial focus is individual educators teaching approximately four students around age 13 in a weekly 90-minute class. These are defaults, not a reason to ignore an educator's stated class needs. Coordinators may help recruit and review pilot lessons; coordinator administration and expansion to other subjects are outside the current scope.
 
-### Product Summary
+### The Job To Be Done
 
-Lesson Planner Q is a voice-first weekly lesson planning tool for Buddhist educators. It helps educators generate lesson plans, rehearse tricky explanations, and log reflections after each lesson to improve future lessons.
+“When I am preparing next week's class with a rough topic and limited time, help me choose an approach, work out how to lead it, and prepare for difficult questions, so I can teach a meaningful lesson without inventing every activity and explanation from scratch.”
 
-The core MVP surface is organized around those three jobs:
+### What Makes This Worth Choosing
 
-- Generate lesson plan: talk through the lesson with PlannerQ, or type thoughts out.
-- Rehearse tricky explanations: practise likely student questions and simpler wording.
-- Log lesson reflections: capture what worked, what did not, and what to try next.
+The differentiation hypothesis is a connected preparation workflow for a specific teaching context:
 
-The first version focuses on Chinese Mahayana folk Buddhism, 90-minute lessons, and small classes of around four 13-year-old students. Visual packs remain part of the lesson planning workflow when a lesson would benefit from printable or illustrated materials, but the core product promise is lesson plan generation plus educator rehearsal.
+| Customer difficulty | Product response | Evidence needed to justify the value |
+| --- | --- | --- |
+| A plausible activity still needs substantial adaptation for this class and tradition. | Three comparable approaches, clear tradeoffs, a reviewed outline, and a timed plan that connects Chinese Mahayana folk Buddhist teaching to students' daily lives. | Educators need fewer major revisions and prefer its classroom fit in a matched comparison with their usual planning method. |
+| A written plan does not resolve uncertainty about what to say or do. | Concrete educator moves, scaffolded student tasks, likely questions, simpler wording, and feedback on a typed practice attempt. | Educators can explain how to run an activity and answer a difficult question; confidence improves after preparation. |
+| Useful observations from last week are easy to lose. | Editable after-class reflections and recent classroom evidence included in future planning. | A subsequent plan makes a relevant adaptation that the educator recognizes and chooses to use. |
 
-### Product Vision
+Voice reduces the friction of starting; it is an input advantage rather than the whole value proposition. Visual materials are useful when they serve the objective. More images, more model calls, or more time in the app are not success measures. These are product hypotheses, not claims about competitors' capabilities.
 
-Help community and volunteer educators walk into class prepared, confident, and able to make Buddhist teachings feel relevant to students' lives.
+## 2. Customer Problem And Context
 
-Over time, Lesson Planner Q can become a broader curriculum assistant for values education, culture, history, language learning, and other subjects.
+The educator may be a volunteer or part-time teacher without formal curriculum training. They need to bring together stories, temple practice, community customs, and Buddhist teachings, then make them concrete for young teenagers. Available sources and local practice vary, so the educator remains responsible for checking the chosen teaching anchor against their temple's context.
 
-## 2. Problem Statement
+The recurring preparation burden has three parts:
 
-Educators teaching Buddhist classes face a recurring weekly preparation burden. They often need to create fresh lessons from scratch, while Buddhist teachings and stories are spread across multiple sources rather than organized into a single classroom-ready curriculum.
+1. Decide what students should understand or practise and choose a feasible lesson approach.
+2. Turn that approach into instructions, activities, materials, discussion, and explanations that work with four students.
+3. Remember what actually happened and adapt the next lesson accordingly.
 
-For Chinese Mahayana folk Buddhism, relevant teaching material may come from sutras, commentaries, temple practices, festivals, stories, devotional figures, oral traditions, and community customs. Educators then need to turn those materials into age-appropriate activities for 13-year-old students.
+Student benefit is a downstream outcome: students have space to ask questions and practise applying teachings to friendship, anger, family expectations, school stress, compassion, gratitude, and social media. The app serves the educator; students do not interact with an unsupervised AI tutor.
 
-Many educators also want to use play-based learning and self-directed learning, but feel ill-equipped. This concern is valid: self-directed learning requires upfront scaffolding, clear instructions, reflection prompts, resources, checkpoints, and facilitation guidance.
+## 3. Prioritized Outcomes And Scope
 
-The educator also learns from each class, but those observations are easy to lose. If a lesson activity worked well, if students struggled with a concept, or if the educator found a better explanation, the next lesson should benefit from that memory.
+| Priority | Outcome | Required capability | Scope decision |
+| --- | --- | --- | --- |
+| P0 | Move from a rough idea to an intentional lesson direction. | Voice-first or typed input, reviewed voice requirements, three distinct options, educator selection, editable outline through feedback. | The primary weekly planning path. |
+| P0 | Leave with a reviewed draft the educator can facilitate. | Timed plan, clear educator/student actions, appropriate scaffolding, visible pedagogy and tradition review, browser print/PDF. | Must work without generating an image or using practice. |
+| P0 | Understand and retain control over the draft. | Explicit input approval after voice, draft labeling, clear review notes, honest capability and storage copy, recoverable errors. | Applies to the entire experience. |
+| P1 | Prepare for a difficult classroom moment. | Optional likely questions, simpler wording, constructive critique of a typed attempt. | Contextual preparation support; never a mandatory gate before the plan. |
+| P1 | Improve next week's preparation using classroom evidence. | Save, inspect, edit, and delete reflections; reuse relevant recent observations; inspect synthesis. | Local browser storage for this prototype. |
+| P1 | Prepare materials an activity actually needs. | Optional printable visual pack guidance and requested image rendering. | Secondary to a usable lesson plan; all material remains a draft for review. |
 
-## 3. Goals And Non-Goals
+P0 means a release-blocking requirement for a trustworthy planning pilot. P1 means supporting value to test without delaying or obscuring the main planning path. Existing P1 features should be preserved while pilot evidence determines further investment.
 
-### Goals
+### Explicit Non-Goals
 
-- Reduce weekly lesson preparation time for Buddhist educators.
-- Generate age-appropriate weekly 90-minute lesson plans grounded in Chinese Mahayana folk Buddhism.
-- Make voice the primary input for planning, with typing as a secondary entry point.
-- Help students connect Buddhist teachings to daily life, including friendship, anger, family expectations, school stress, compassion, gratitude, and social media behavior.
-- Support play-based learning and scaffolded self-directed learning.
-- Let educators compare lesson plan options before committing to a brief.
-- Give educators facilitation notes that make lessons easier to run.
-- Help educators rehearse difficult explanations and skeptical student questions.
-- Prompt visual pack generation when the chosen lesson plan would benefit from classroom materials.
-- Capture post-class reflections so future lesson plans build on past classroom experience.
-- Preserve educator control and review before classroom use.
+- Unsupervised student interaction, assessment, or grading.
+- Doctrinal certification or replacement of educator/temple judgment.
+- Covering all Buddhist traditions or expanding to other subjects before proving this weekly use case.
+- Multi-year curriculum generation, organizational administration, or shared lesson libraries.
+- Live classroom assistance, voice rehearsal, and voice reflection debriefs in the current release.
+- Mandatory images, mandatory rehearsal, or a dashboard of activity metrics as the entry experience.
+- Accounts, cross-device sync, or a claim that local drafts are saved in a cloud library.
 
-### Non-Goals For MVP
+## 4. Current Capability Baseline
 
-- Cover all Buddhist traditions.
-- Replace the educator as facilitator.
-- Provide unsupervised AI interaction directly to students.
-- Guarantee doctrinal authority without curated source review.
-- Build a complete multi-year curriculum.
-- Support every subject area at launch.
-- Automate classroom assessment or grading.
+This is the implementation baseline for product planning, not proof that all acceptance criteria below have passed. `PROJECT.md` remains the detailed implementation reference.
 
-## 4. Target Users
+| Area | Current behavior | Remaining boundary or deferred work |
+| --- | --- | --- |
+| Planning input | Realtime voice planning with live captions and a retained local transcript; extraction into editable topic, objectives, and planning requirements; explicit educator approval. Typed input is available. | Voice gathers requirements; it does not generate lesson artifacts in the conversation. |
+| Class context | Defaults to age 13, four students, and 90 minutes. Educators can describe timing, student needs, and constraints in planning requirements. | Dedicated class-profile configuration and reliable validation of varied durations need further work. |
+| Direction and outline | Three lesson options; educator selection; an outline generated and revised from feedback. | “Lesson outline” is the educator-facing term; `LessonBrief` and `/api/brief` remain internal names. |
+| Quality review | Options, initial/updated outlines, and full plans receive structured review and at most one revision before display; review notes remain visible. | Model review does not establish source authority or certify accuracy. |
+| Lesson output | Structured full lesson draft with browser print/save-as-PDF. | Direct full-plan text editing, editable document export, and a persistent lesson library are not implemented. Refine the outline and regenerate the plan for changes. |
+| Practice | Generated likely questions and coaching; critique of a typed educator attempt. | Interactive voice rehearsal is deferred. |
+| Materials | Visual pack text, story/scenario/value cards, storyboard and worksheet prompts, one requested generated image; browser print/PDF. | This is not a curated catalog or an automatic production-ready illustrated workbook. |
+| Classroom evidence | Local reflection create/edit/delete; up to 20 reflections, with five recent reflections used in planning; inspectable model synthesis of raw reflections. | No cross-device sync; fully editable synthesized memory is deferred. |
+| Sources and measurement | Local internal reference notes, deterministic API evals, and local browser planning events. | No vetted source retrieval/citation library, centralized analytics, or measured customer outcome evidence. |
 
-### Primary User
+## 5. Core Experience
 
-A Buddhist educator, volunteer teacher, or part-time instructor teaching a small weekly class of 13-year-old students.
+1. **Talk about it.** The first screen invites a topic, student takeaway, student needs, timing, and constraints. “Type it out” remains easy to find. The default class context is visible without requiring a setup form.
+2. **Check the requirements.** After talking, the educator can inspect the transcript, edit the captured requirements, and explicitly approve them. The conversation cannot choose an approach or draft materials on the educator's behalf.
+3. **Choose an approach.** Compare three distinct options by classroom fit and tradeoff. Read more only as needed, select one, and continue to the outline.
+4. **Shape the outline.** Review the student takeaway, structure, choices, open questions, and quality notes. Give feedback if needed, then generate the full plan. Practice and materials are optional when useful.
+5. **Prepare to teach.** Inspect the timed lesson and educator moves, review tradition and pedagogy notes, then print or save as PDF. Use optional practice or materials to resolve a specific preparation need.
+6. **Remember what happened.** After class, save a short reflection and use relevant observations in future planning. Starting another draft must not delete saved reflections.
 
-The educator may not be formally trained in curriculum design. They want lessons that are meaningful, practical, and engaging, but they have limited time to prepare.
+The typed path joins the same option-and-outline workflow. No educator should have to grant microphone access, generate an image, or rehearse to obtain a plan.
 
-### Secondary Users
+## 6. Functional Requirements And Acceptance Criteria
 
-- Temple education coordinators who want more consistent lesson quality.
-- Buddhist education groups that support volunteer educators.
-- Future educators in adjacent subjects such as values education, culture, language, or history.
+The criteria below are target requirements for implementation and pilot verification. An existing route alone does not demonstrate that a criterion is met.
 
-### Student Context
+### P0-1: Capture The Educator's Intent
 
-- Age: 13 years old.
-- Class size: approximately four students.
-- Lesson length: usually 90 minutes.
-- Learning goal: see the relevance of Buddhist teachings and apply them in everyday life.
-- Preferred lesson style: play-based learning and scaffolded self-directed learning.
+- Voice is the primary entry action; typing is a visible alternative. Topic, intended takeaway, student needs, timing, and constraints are invited in plain language.
+- Optional everyday-topic starters populate editable requirements without making a generation request. They must not overwrite an educator's existing input.
+- During voice planning, readable captions identify only “PlannerQ” and “You.” Partial transcripts must not leave duplicate final messages. The educator can clearly end the session.
+- After voice planning, extracted requirements are editable and show unresolved questions or uncertainty. No option or outline generation uses unapproved extracted requirements.
+- An educator can correct a misheard topic and verify the corrected topic before continuing. The retained transcript is inspectable and copyable as source notes, not treated as an approved plan.
+- Denied microphone permission or a failed connection offers an actionable explanation and an accessible typed path without discarding existing input.
 
-## 5. Differentiation
+### P0-2: Make A Meaningful Choice
 
-Generic AI lesson planners can generate activities, worksheets, and lesson outlines. For this educator, that is helpful but incomplete. The harder problem is not just producing content; it is turning scattered Buddhist teachings into respectful, age-appropriate, practice-oriented lessons that a volunteer educator can confidently facilitate for 90 minutes.
+- Generate exactly three options with visibly different activity structures, not title-only variations.
+- Every option includes its approach, best fit, lesson shape, sample activities, a concrete tradeoff, material recommendation, and practice focus.
+- A first comparison view exposes the decision-making information; longer details can expand without changing selection.
+- Selection is explicit and visually clear, and the next action names the outline being created. Generating a new set of options clears an obsolete selection and downstream artifacts.
+- Run bounded pedagogy/tradition review and one revision when requested; display `optionReview` so the educator can assess unresolved issues.
 
-Lesson Planner Q is differentiated in nine ways:
+### P0-3: Refine Before Expanding
 
-- Voice-first planning: Educators can think aloud while the planner asks clarifying questions.
-- Tradition-specific: It defaults to Chinese Mahayana folk Buddhism and avoids presenting Buddhism as one uniform tradition.
-- 90-minute lesson design: It structures lessons for the actual weekly class length rather than assuming a short school period.
-- Small-class fit: It designs activities for four students, where discussion, role play, and turn-taking can be more personal.
-- Option review: It presents multiple lesson approaches so the educator can choose what fits the class.
-- Application-first: It connects teachings to school, family, friendship, stress, social media, and moral choices.
-- Scaffolded pedagogy: It uses gradual release of responsibility so self-directed learning is supported rather than vague.
-- Educator confidence: It includes rehearsal coaching for difficult questions, skeptical students, and simpler explanations.
-- Lesson memory: It captures what worked and what did not, then uses those reflections to improve future lessons.
+- Generate an outline from the approved/typed context and chosen approach. Include a student takeaway, key choices, suggested structure, open questions, review prompts, material recommendation, and practice focus.
+- Educator feedback revises the outline and shows what changed. Both initial generation and updates retain visible `agentReview`.
+- Label the outline as a draft. Let the educator continue to a full lesson without mandatory rehearsal or image generation.
+- When the outline changes, later artifacts must be regenerated or clearly identified as based on an earlier version. A printable plan must not silently contradict the outline the educator just reviewed.
 
-The product should be evaluated against generic AI lesson planners not only on output speed, but on whether the educator feels more prepared to teach respectfully, facilitate discussion, and help students apply Buddhist teachings in daily life.
+### P0-4: Deliver A Lesson Draft The Educator Can Facilitate
 
-## 6. User Needs
+- A lesson includes objectives, a contextualized teaching anchor, timed flow, educator moves, student actions, play-based activity instructions/materials/debrief, scaffolded self-directed learning, reflection, everyday application, an optional take-home activity, and educator/review notes.
+- Required segments fit the requested duration, default 90 minutes; optional extensions are marked separately. An educator can explain what to do, what students do, and what materials to prepare for each core activity.
+- Student tasks work with the stated class size and needs. For the default four students, participation must not depend on large teams or extensive equipment the educator did not request.
+- Self-directed work includes a model (“I do”), guided practice (“We do”), a bounded independent/pair task (“You do”), choices, a checkpoint, and a debrief. Play and visual content must advance the objective.
+- Full-plan generation applies bounded review and one revision when requested and shows `agentReview`. Remaining educator judgment calls are easy to locate.
+- The reviewed plan can be printed or saved through the browser PDF dialog with readable flow and without workspace controls. Describe this as browser printing, not editable document export or automatic cloud saving.
 
-### Educator Needs
+### P0-5: Preserve Cultural Context And Educator Authority
 
-- I need a fresh lesson plan every week without starting from a blank page.
-- I need to talk through a rough idea before I know exactly what I want.
-- I need Buddhist source material translated into age-appropriate teaching content.
-- I need confidence that the lesson is respectful and aligned with Chinese Mahayana folk Buddhism.
-- I need activities that work for a small class.
-- I need help using self-directed learning without leaving students unsupported.
-- I need ways to make abstract teachings feel practical.
-- I need printable or display-ready materials when the lesson needs them.
-- I need to rehearse how to answer difficult student questions.
-- I need to capture what happened after class so next week's lesson can build on it.
+- Outputs default to Chinese Mahayana folk Buddhist context and acknowledge variation where relevant; do not collapse traditions into generic Buddhism.
+- Do not invent scripture quotations, source citations, temple approval, or claims of authoritative religious validation. Local reference notes are internal guidance, not a vetted source library.
+- Repair requests for generic framing, unsupported karma/merit certainty, fear-based moralizing, or unscaffolded self-directed tasks through the review process rather than treating them as preferences to obey.
+- Distinguish practical classroom examples from doctrinal claims. Flag teaching anchors, rituals, and sacred imagery requiring educator/temple review.
+- All generated artifacts are drafts for educator review. Review notes must remain visible in the option, outline, and full-plan flows; the app must not imply that model review makes classroom review unnecessary.
+- Keep every AI interaction educator-facing. Do not introduce direct unsupervised student use.
 
-### Student Needs
+### P1-1: Prepare Words To Use In Class
 
-- I need lessons that feel connected to my actual life.
-- I need activities that let me discuss, play, reflect, and apply ideas.
-- I need Buddhist teachings explained in language I can understand.
-- I need room to ask questions without feeling judged.
+- Practice is tied to the lesson topic or outline and offers realistic questions from a 13-year-old, suggested responses, and simpler language.
+- The educator can select a question, type an answer, and receive specific feedback on clarity, tone, age fit, and tradition caution, with a suggested revision.
+- Feedback addresses teaching language rather than judging the educator's personal faith. It is a coaching draft, not a test score.
+- Label the current interaction accurately as typed practice; do not imply that live voice rehearsal is available.
 
-## 7. Core User Journey
+### P1-2: Reuse Classroom Evidence
 
-1. The educator starts by voice.
-2. The planner asks clarifying questions about the topic, class context, desired takeaway, and constraints.
-3. The planner generates several lesson plan options.
-4. The educator reviews the options in bite-sized chunks and selects the best approach.
-5. The planner generates a structured lesson brief.
-6. The educator gives feedback or edits the brief.
-7. The planner updates the brief.
-8. If visual materials are useful, the planner prompts the educator to generate a visual pack.
-9. The planner prompts the educator to rehearse tricky explanations with the rehearsal coach.
-10. The educator practices, then makes further changes to the brief if needed.
-11. The planner updates the lesson plan and regenerates the visual pack if the plan changed.
-12. After the lesson, the educator logs reflections about what worked, what did not, student response, and what to try next.
-13. Future lesson options, briefs, visuals, rehearsal prompts, and full lesson plans use the saved lesson memory.
+- Reflection entry supports lesson date, topic, plan used, what worked, what did not, student response, and what to try next. A short useful note should be possible without filling every field.
+- Educators can inspect, edit, and delete raw reflections. Explain that storage is local to this browser and avoid asking for student full names.
+- Include up to five recent reflections in planning as evidence, not instructions that override current requirements or tradition safeguards. Avoid interpreting a small set of observations as permanent student traits.
+- Show an empty state when there is no memory. Inspectable synthesis must preserve its source reflections and be marked stale when those sources change.
+- For a fixture such as “students struggled with long explanations; next time use a short model and paired role play,” the next relevant lesson should visibly incorporate an appropriate adjustment that the educator can identify. Irrelevant history should not be forced into a plan.
 
-Typing a brief remains available as a secondary entry point for educators who already know the lesson direction.
+### P1-3: Make Necessary Materials Easier To Prepare
 
-## 8. Core Use Cases
+- Recommend materials when their learning purpose is clear, with a brief rationale. Core planning remains usable without them.
+- Generate printable story/scenario/value cards, storyboard prompts, and worksheet guidance suited to the activity and age group. Image rendering is a separate educator action.
+- Include cultural/visual review notes, especially for sacred figures, rituals, or offerings. Text-heavy prompts and generated image text require educator checking before classroom use.
+- Printed material must be readable and omit application controls. A visual pack should match the current outline/plan or disclose that it needs regeneration.
 
-### Use Case 1: Plan A Lesson By Voice
+## 7. Frontend Design Requirements
 
-The educator speaks naturally:
+The interface should make an educator feel ready to make the next planning decision. Use calm hierarchy, generous spacing, readable type, restrained color, and clear selected states. Do not make decorative styling compete with the lesson content.
 
-> "Next week I want to teach compassion, but my students are restless and I want an activity."
+- **Entry:** A single dominant “Talk about it” action, a clear “Type it out” fallback, a concise benefit, and compact default-class context. A new user should be able to identify the audience, benefit, and next step without scrolling through a feature list.
+- **Progress:** Present only steps and secondary tools useful at the current stage. Keep metrics, reference notes, and detailed memory out of the initial workspace.
+- **Comparison:** Give option cards a consistent structure. Keep the current selection, tradeoff, and next action clear; use progressive disclosure for long explanations.
+- **Artifacts:** Make the outline and plan read like teaching documents, with a clear summary, scannable sequence, and review notes beside the decision they inform. Optional practice and materials should not compete with the main continue/print action.
+- **Continuity:** Collapse completed options and outlines into accessible summaries when the next artifact is ready, retain a way to revisit them, and move keyboard focus to the new artifact. Prevent requirement changes, option switching, or draft resets from racing with an in-flight request.
+- **States:** Loading explains which artifact is being prepared; failures retain input and offer a retry. Draft reset explains what it clears and preserves saved classroom reflections.
+- **Accessibility:** Use labeled controls, semantic headings, visible keyboard focus, adequate text contrast, keyboard-operable disclosure, and primary touch targets of at least 44px. Voice cannot be the only input.
+- **Responsive behavior:** At 375px, 768px, and desktop widths, primary content fits without horizontal scrolling; forms and options remain readable; the current main action is discoverable. Printed artifacts must be checked separately from screen layout.
+- **Language:** Use “lesson outline,” “Talk about it,” “Type it out,” and “Practice.” Avoid internal language such as agents, critic, signals, MVP, or prompt caching in educator action copy. Review notes can describe practical classroom and tradition considerations without exposing implementation mechanics.
 
-The product asks follow-up questions, clarifies constraints, and generates lesson options. This supports educators who think through lessons aloud more naturally than they complete forms.
+## 8. Quality, Reliability, And Data Boundaries
 
-### Use Case 2: Type A Lesson Brief
+Structured model output must remain aligned with TypeScript types and JSON schemas. The application owns workflow, selection, approval, storage limits, and artifact state; models draft, review, and revise content inside those boundaries. One revision is the maximum automatic review loop, with remaining concerns shown to the educator.
 
-The educator opens the secondary typed brief panel and enters the topic, desired outcome, class context, and planning notes. The product uses the typed brief to generate lesson options.
+Voice requires microphone permission only. Saved reflections and the latest voice transcript are local browser data; relevant inputs and recent reflections are sent to the API/model for generation. “Saved locally” must not imply that generation happens entirely on-device. No account, sync, or centralized analytics should be implied. Production storage and sharing require an explicit privacy, retention, and deletion design before implementation.
 
-### Use Case 3: Review Lesson Options
+Performance targets are hypotheses to instrument during the pilot: a standard outline within two minutes and a full plan within five minutes, excluding optional image generation. Record model wait separately from active educator preparation and report the median and slowest observed pilot case. Useful loading states and retry behavior are required even when these targets are missed. Keep caching and model configuration in implementation documentation, not the customer value proposition.
 
-The product shows several possible lesson approaches, such as a role-play lesson, a station-based lesson, or a story-and-reflection lesson. Each option shows the core idea, best fit, sample activities, tradeoffs, and whether visuals or rehearsal are recommended.
+## 9. Validation Plan And Success Measures
 
-### Use Case 4: Generate A Weekly Lesson Brief
+### Pilot Design
 
-After the educator selects an option, the product generates a structured brief with summary, student takeaway, teaching anchor, clarifying questions, facilitation guidance, visual recommendation, and rehearsal recommendation.
+The product lead should recruit 6–8 educators from the target context for a four-week pilot before expanding scope. This is a proposed research plan, not a completed study. Establish each educator's usual weekly planning method and active preparation time. Use at least one paired preparation exercise with comparable lesson needs and the same supplied class context; vary method order where practical. Ask a suitable educator/temple reviewer to assess tradition fit without relying on the app's own model review.
 
-### Use Case 5: Generate A Full Lesson Plan
+Collect minimal, volunteered evidence: preparation time, whether the draft was used, major changes needed, readiness before/after, and a short post-class reflection. Do not collect student identities or infer learning impact from generation events. A small pilot provides directional product decisions, not statistically conclusive efficacy claims.
 
-The educator generates a complete 90-minute lesson plan from the reviewed brief. The plan includes timing, objectives, activities, discussion prompts, reflection questions, facilitation notes, materials, and optional extension or take-home activity.
+### Operational Definition Of A Useful Plan
 
-### Use Case 6: Generate Lesson Visual Packs
+A plan counts as educator-approved when the educator has checked the teaching anchor and review notes, can explain how to run the timed flow, can prepare its materials, and would use it with only minor wording or context changes. Replacing the main activity, rebuilding the scaffold/timing, or correcting a core tradition claim counts as a major revision.
 
-When the selected plan would benefit from visual materials, the product generates classroom-ready visual pack guidance such as scenario cards, story cards, reflection prompts, classroom posters, role-play cards, matching cards, and worksheet prompts.
+The primary outcome is the **proportion of started pilot planning sessions that produce an educator-approved plan subsequently used or adapted for class**. Record approval and actual use separately; a generated or printed artifact alone does not satisfy this measure.
 
-Example:
+| Measure | Proposed pilot decision threshold | Collection method |
+| --- | --- | --- |
+| First-session usability | At least 80% of participants reach and review a full plan without facilitator rescue. | Observed task; log friction and errors. |
+| Lesson usefulness | At least 70% of completed pilot plans meet the useful-plan definition without major revision. | Educator review plus revision notes. |
+| Weekly value | At least 60% of participants use a reviewed plan for two or more classes in the pilot. | Voluntary post-class check-in; denominator is all enrolled participants. |
+| Preparation effort | Median active preparation time improves by at least 25% versus the participant's baseline, with quality thresholds maintained. | Start/stop diary including review, adaptation, practice, and materials; record model wait separately. This is a decision target, not a marketing promise. |
+| Preparation confidence | At least 70% of participants report an improvement of at least one point on a five-point readiness scale. | Before/after question plus an example of what became easier to teach. |
+| Tradition and classroom quality | No unresolved critical misrepresentation, harmful doctrinal certainty, or unsupervised-student pathway in the release corpus. | Human review plus targeted adversarial evals; block release and repair critical failures. |
+| Reflection utility | At least 70% of tested next-lesson drafts with relevant saved evidence include a useful, recognizable adaptation. | Educator comparison against the source reflection; report the number of eligible drafts. |
 
-> "Create four comic-style panels showing a student choosing compassion during a school conflict."
+No time-saving percentage should be presented as a proven benefit until evidence supports it. Thresholds are provisional and should be revisited after baseline data, without retrospectively presenting revised targets as original results.
 
-### Use Case 7: Rehearse Before Class
+### Diagnostic Measures
 
-The educator practices with a voice-based rehearsal coach.
+Track option generation, selection, outline generation/refinement, full-plan generation, practice, reflection, and print events to locate friction. Current events are local browser data only. They do not establish a unique user count, retention, actual classroom use, or time saved. A pilot diary/manual review supplies missing outcome evidence; adding analytics requires a separate product decision.
 
-Example:
+Voice uptake, visual-pack count, and practice frequency are diagnostics, not adoption quotas. If typed planning works better for an educator or a lesson needs no visuals, that is compatible with success.
 
-> "Pretend you are a skeptical 13-year-old. Ask me hard questions about karma."
+### Verification Before Pilot Release
 
-The product simulates student responses, helps the educator practice explanations, and suggests simpler language.
+- Run `npm run build` and targeted `npm run eval:local -- --case ...` checks when changing prompt contracts, schemas, or review behavior.
+- Exercise voice approval, typed fallback, option selection, outline feedback, full-plan generation, and browser print. Verify review notes at each applicable stage.
+- Inspect mobile/desktop layouts and keyboard focus; test empty, loading, error, and selected states.
+- Check adversarial generic-Buddhism, weak-scaffolding, and overconfident karma/merit cases. Human review remains necessary beyond deterministic checks.
+- Confirm reflection save/edit/delete and relevant next-lesson reuse, with honest local-storage disclosure.
+- Log known gaps rather than presenting target acceptance criteria as implemented behavior.
 
-### Use Case 8: Capture Post-Class Reflection
+## 10. Rollout And Investment Decisions
 
-After class, the educator logs what happened:
+1. **Validate the weekly loop:** Complete P0 usability/reliability checks and run the focused pilot with existing practice, materials, and reflection support. Fix abandonment points and major rewrite causes first.
+2. **Invest in the demonstrated bottleneck:** If educators cannot adapt/export drafts, prioritize editable output and document export. If tradition checking dominates preparation, prioritize a vetted source layer with temple reviewers. If difficult explanations dominate uncertainty, test voice practice. Do not add all three merely to broaden the feature list.
+3. **Deepen repeat use:** Improve inspectable/editable reflection synthesis and lesson continuity after evidence shows educators return weekly. Consider persistent storage only with an explicit privacy and migration plan.
+4. **Expand only after value is demonstrated:** Multi-week curriculum, coordinators, other traditions/subjects, and live classroom support require separate discovery and requirements. They are not promises in the current entry experience.
 
-- lesson plan used
-- what worked well
-- what did not work
-- student response
-- what to try next time
+If pilot quality is strong but preparation time does not improve, investigate review and adaptation effort before adding more generation. If the main value is confidence rather than speed, revise positioning using observed evidence. Do not scale the breadth of the product until the narrow weekly preparation problem is working.
 
-The product stores this as lesson memory and uses it when drafting future lessons.
+## 11. Open Product Decisions
 
-### Use Case 9: Get Live Facilitation Support
-
-During class, the educator quietly asks:
-
-> "Give me a 5-minute backup activity because the students finished early."
-
-This is deferred from the core MVP unless implemented as a limited educator-only beta. The product must not support unsupervised student-agent interaction in MVP.
-
-## 9. MVP Scope
-
-### Included In MVP
-
-- Voice-first lesson planning interview.
-- Secondary typed brief entry.
-- Topic-based weekly lesson option generation.
-- Lesson option comparison and selection.
-- Chinese Mahayana folk Buddhism as the initial tradition focus.
-- Student age and class size customization.
-- 90-minute lesson default with lesson duration customization.
-- Play-based activity generation.
-- Scaffolded self-directed learning generation using gradual release of responsibility: "I do, we do, you do."
-- Structured lesson brief generation and update flow.
-- Agentic critic review and one-pass revision for lesson options before educator display.
-- Full 90-minute lesson plan generation.
-- Agentic critic review and one-pass revision for full lesson plans before educator display.
-- Educator facilitation notes.
-- Discussion prompts and reflection questions.
-- Real-life application exercises.
-- Educator rehearsal coach for practicing explanations and student questions.
-- Visual pack recommendation and generation when useful for the selected lesson.
-- Educator review before finalizing generated materials.
-- Lesson memory for post-class reflection and future planning context.
-- Local persistence for saved lesson reflections in the prototype.
-- Small curated pedagogy library used as lesson-design guardrails.
-- Educator-visible rationale explaining why the generated lesson design fits the class context.
-- Educator-visible review notes from the pedagogy critic and tradition reviewer.
-- Professional, calm, Apple-inspired interface principles: clarity, hierarchy, spaciousness, direct manipulation, and minimum 44px touch targets.
-
-### Deferred From MVP
-
-- Live facilitation copilot, unless implemented as a limited educator-only beta.
-- Voice-based post-class reflection debrief.
-- Multi-week curriculum planning.
-- Full curated Buddhist source library.
-- Support for multiple Buddhist traditions.
-- Direct student-facing AI tutor.
-- Multi-subject expansion.
-- Organization-level lesson libraries and coordinator workflows.
-
-## 10. Functional Requirements
-
-### Voice-Based Lesson Planning
-
-- The system must make voice the primary planning input.
-- The system should allow educators to speak a lesson planning request naturally.
-- The system should display a readable conversation transcript during voice planning.
-- The transcript should show only two speakers: PlannerQ and You.
-- The system should avoid showing partial word-by-word duplicate transcript blocks as final messages.
-- The system should ask clarifying questions when important details are missing.
-- The system should convert the voice conversation into structured lesson inputs.
-- The system should generate lesson options from the structured inputs.
-- The system should allow educators to review and edit the resulting brief.
-
-### Typed Brief Entry
-
-- The system must provide a secondary path for typed planning.
-- The typed brief entry should appear inside the typed brief panel when expanded.
-- The typed brief should support topic, desired outcome, class context, and planning notes.
-- The system should generate lesson options from typed input.
-
-### Lesson Option Review
-
-- The system must generate multiple lesson plan options before generating a final brief.
-- The system must display lesson options in bite-sized cards.
-- Each option should include the title, short description, best-fit context, sample activities, tradeoffs, visual recommendation, and rehearsal focus.
-- The educator must be able to select an option.
-- Selected state should appear once and be visually unambiguous.
-- The educator should be able to expand or collapse option details without losing their place.
-
-### Lesson Brief Generator
-
-- The system must generate a structured lesson brief from the selected option.
-- The brief must include a summary, student takeaway, teaching anchor, clarifying questions, facilitation notes, visual recommendation, and rehearsal recommendation.
-- The educator must be able to provide feedback and update the brief.
-- The brief should clearly label generated content as draft material requiring educator review.
-
-### Full Lesson Plan Generator
-
-- The system must default lesson duration to 90 minutes.
-- The system must generate a complete weekly lesson plan.
-- The system should run a pedagogy critic and tradition reviewer over the draft plan before showing it.
-- The system should revise the plan once when the critic identifies concrete improvements.
-- The lesson plan must include learning objectives, timing, opening activity, main activity, discussion prompts, reflection questions, facilitation notes, materials, and optional take-home activity.
-- The lesson plan should include visible review notes about pedagogy, tradition handling, and educator judgment calls.
-- The system must support play-based and self-directed lesson formats.
-- The system must allow the educator to edit generated content.
-
-### Buddhist Teaching Support
-
-- The system must default to Chinese Mahayana folk Buddhism for MVP.
-- The system must avoid presenting Buddhism as a single uniform tradition.
-- The system should include tradition labels and context notes where relevant.
-- The system should avoid overconfident doctrinal claims when source support is limited.
-- The system should prefer curated or approved source material when available.
-
-### Self-Directed Learning Support
-
-- The system must scaffold self-directed learning activities.
-- The system must include educator guidance for how to introduce, monitor, and debrief self-directed tasks.
-- The system should include checkpoints, student prompts, and reflection tasks.
-- The system should adapt self-directed learning activities for a small class of four students.
-
-### Educator Rehearsal Coach
-
-- The system should allow educators to rehearse explanations before class.
-- The system should simulate realistic 13-year-old student questions.
-- The system should help the educator simplify abstract Buddhist concepts.
-- The system should provide constructive feedback on clarity, tone, and age appropriateness.
-- The system should avoid judging the educator's personal faith or practice.
-
-### Visual Material Generator
-
-- The system should recommend visual materials only when they add value to the selected lesson.
-- The system should generate age-appropriate visual aid plans.
-- The system should generate printable story cards, scenario cards, value cards, role-play cards, matching cards, classroom posters, activity sheets, and reflection worksheet prompts.
-- The system should support comic-style panels for everyday moral scenarios.
-- The system should support Buddhist storyboards for arrange-discuss-reflect activities.
-- The system must require educator review before generated visuals are used in class.
-
-### Lesson Memory
-
-- The system must let educators log post-class reflections.
-- Reflections must include lesson date, topic, lesson plan used, what worked well, what did not work, student response, and what to try next.
-- The system must let educators review saved reflections.
-- The system must let educators edit or delete saved reflections.
-- The interface should clearly explain where reflections are saved. In the prototype, reflections are saved in the educator's browser local storage.
-- The system should include recent reflections when generating future options, briefs, visuals, rehearsal prompts, and full lesson plans.
-- The system should make it clear when no reflections have been saved.
-- The prototype may store reflections locally; production storage requires privacy review.
-
-### Live Facilitation Copilot
-
-- The system should support quick educator-facing suggestions during class in a later release.
-- The system should generate short backup activities, discussion prompts, transitions, and debrief questions.
-- The system must not be positioned as an unsupervised student-facing agent for MVP.
-
-## 11. Non-Functional Requirements
-
-### Quality
-
-- Generated lesson plans should be understandable to educators without curriculum design training.
-- Generated activities should be feasible for a class of four students.
-- Outputs should use age-appropriate language for 13-year-old students.
-- Generated plans should be editable and easy to scan.
-- Lesson options should be chunked so educators can compare approaches without excessive scrolling.
-
-### Safety And Trust
-
-- Educators must remain in control of what is taught.
-- Student-facing materials must be reviewed before use.
-- The product must handle religious content respectfully.
-- The product must avoid unsupported claims about Buddhist doctrine.
-- The product must avoid direct unsupervised interactions with minors in MVP.
-- Reflection data may mention students, so production storage must consider consent, privacy, and retention.
-
-### Accessibility
-
-- Voice planning should support educators who prefer speaking to typing.
-- Typing should remain available for quiet environments or educators who prefer written planning.
-- Primary controls should meet minimum touch target size.
-- Transcript text should be readable and scannable.
-- Printable materials should use clear text and classroom-friendly layouts.
-- Visual outputs should avoid clutter and should be legible when printed.
-
-### Performance
-
-- A standard lesson brief should be generated in under 2 minutes.
-- A complete lesson plan plus visual material suggestions should be generated in under 5 minutes.
-- The educator should be able to reach a usable lesson draft in under 10 minutes.
-- Prompt caching should be used where appropriate for stable system instructions and schemas.
-
-## 12. AI Capability Mapping
-
-Lesson Planner Q should make clear to educators and builders which parts are model-generated and which parts are application logic. The product is not a fully autonomous lesson designer; it is a structured planning workflow that asks LLMs to draft specific artifacts inside app-defined boundaries.
-
-The agentic direction is a bounded loop: draft, critique, revise once, show the educator the draft plus review notes, rehearse, and carry classroom evidence into the next plan. The deterministic product shell should continue to own navigation, state, validation, review gates, storage, and the educator-facing boundary.
-
-### LLM-Generated Capabilities
-
-LLMs should generate draft content where open-ended judgment, language, examples, and classroom adaptation are needed:
-
-- lesson option drafts
-- pedagogy critic and tradition reviewer notes for lesson options
-- one-pass lesson option revisions when the critic requests concrete changes
-- lesson brief drafts and brief revisions
-- full lesson plan drafts
-- pedagogy critic and tradition reviewer notes for full lesson plans
-- one-pass full lesson plan revisions when the critic requests concrete changes
-- visual material pack drafts and image prompts
-- rehearsal scenarios, likely student questions, simpler wording, and coaching notes
-- educator-facing voice planning and rehearsal conversation
-- generated lesson images, when the educator requests image rendering
-
-All LLM-generated content must remain educator-reviewed draft material. The product should avoid implying that generated content is doctrinally authoritative, classroom-ready without review, or a substitute for the educator's judgment.
-
-### Rules-Based And App-Controlled Capabilities
-
-Rules-based logic should define the product structure around the LLM outputs:
-
-- planning workflow order and navigation
-- typed form fields, defaults, and request payload assembly
-- selected lesson option state and whether a brief, plan, visual pack, or rehearsal can be requested
-- local reflection creation, editing, deletion, display, and browser storage
-- limits on how many recent reflections are sent as planning memory
-- API route boundaries, health checks, environment-driven model selection, error handling, and prompt-cache configuration
-- JSON schema contracts for generated text artifacts
-- deterministic local eval graders for schema shape and product guardrails
-
-Rules and schemas constrain the model's output shape and product flow, but they do not verify religious accuracy, cultural appropriateness, or classroom fit by themselves. Those still require educator review.
-
-### Agentic Planning Loop
-
-The target loop is:
-
-1. Educator talks or types.
-2. Interview agent extracts structured planning context.
-3. Option agent creates three approaches.
-4. Pedagogy critic and tradition reviewer inspect the options.
-5. Option agent revises weak options before showing them.
-6. Educator selects one.
-7. Brief/plan agent drafts.
-8. Critic reviews the full plan.
-9. Plan agent revises once.
-10. Educator sees the draft plus review notes.
-11. Rehearsal agent helps the educator practice.
-12. After class, reflection agent summarizes classroom evidence into memory.
-13. Next planning session starts with that memory.
-
-The implemented first build slices cover option review/revision and full-plan review/revision, with local eval coverage for schema shape, pedagogy signals, tradition-review signals, and adversarial guardrails. Structured interview extraction, brief critique, rehearsal attempt critique, and reflection memory synthesis remain roadmap work after this validated review-loop foundation.
-
-### GPT Realtime 2
-
-GPT Realtime 2 should power educator-facing voice experiences:
-
-- voice lesson planning interview
-- readable transcript window during planning
-- educator rehearsal coach
-- future educator-facing live facilitation copilot
-- future voice-based post-class debrief
-
-Realtime voice is most valuable where the educator is thinking aloud, practicing, or responding to classroom conditions.
-
-### GPT Image 2
-
-GPT Image 2 should power classroom material generation when the lesson plan calls for it:
-
-- lesson visual packs
-- story cards
-- scene illustrations
-- reflection worksheets
-- classroom posters
-- play-based game assets
-- Buddhist storyboards
-
-Image generation is most valuable where the educator would otherwise need design time, illustration skill, or printable material preparation.
-
-### Prompt Caching
-
-Prompt caching should be used for stable instruction layers, including product scope, safety constraints, pedagogy guidance, schema instructions, and tradition handling. Dynamic lesson inputs, educator feedback, and lesson memory should remain outside the stable cached prefix where possible.
-
-## 13. Content And Pedagogy Requirements
-
-### Tradition Focus
-
-The MVP must focus on Chinese Mahayana folk Buddhism. It should acknowledge that Buddhism has many forms and avoid generalizing across traditions.
-
-### Age Appropriateness
-
-Lessons should be designed for 13-year-old students. Content should avoid overly abstract, moralizing, or adult-oriented framing. It should connect teachings to daily life.
-
-### Lesson Length
-
-The default lesson length should be 90 minutes. Generated lessons should include enough variety to sustain attention across the full session, including opening, teaching anchor, play-based activity, scaffolded self-directed task, discussion, reflection, and close.
-
-### Teaching Style
-
-The product should support:
-
-- play-based learning
-- guided discussion
-- role play
-- scenario-based learning
-- reflection
-- scaffolded self-directed learning
-
-### Self-Directed Learning Framework
-
-The MVP should use gradual release of responsibility:
-
-- I do: educator introduces the teaching or models a reflection.
-- We do: class explores a scenario together.
-- You do: students apply the teaching independently, in pairs, or through a small-group activity.
-
-### Pedagogy Reference Layer
-
-The product should use established education references as lesson-design guardrails, not as long citations pasted into every lesson. The product should generate from a small curated pedagogy library, then adapt those principles to the educator's topic, class context, student needs, lesson length, and prior lesson memory.
-
-This layer should support three jobs:
-
-- Generation rubric: evaluate whether the lesson is age-appropriate, active, reflective, scaffolded, and feasible for a small 90-minute class.
-- Prompt/RAG layer: provide compact reference guidance to the model when generating lesson options, briefs, rehearsal prompts, visual recommendations, and full lesson plans.
-- Educator-visible rationale: briefly explain why a lesson design fits the class, such as "uses gradual release because students need structure before self-directed practice" or "uses role-play because this class responds well to movement."
-
-The rationale should be short and practical. It should help the educator trust and improve the plan without turning the lesson output into an academic literature review.
-
-Recommended reference families:
-
-- CASEL social and emotional learning competencies.
-- Character education frameworks, such as the Jubilee Centre's practical wisdom and virtue language.
-- Self-determination theory for autonomy, competence, and relatedness.
-- Self-regulated learning for goal setting, monitoring, reflection, and adjustment.
-- Project Zero thinking routines for visible thinking and discussion.
-- Learning-through-play principles: meaningful, joyful, socially interactive, actively engaging, and iterative.
-- Making Caring Common-style moral development guidance for empathy, care, and community responsibility.
-
-The product should translate these references into practical lesson structures, prompts, and review rubrics. It should not require the educator to understand each framework before using the product. Citations or framework labels may be available in an optional "why this works" view, but they should not clutter the main lesson plan or student-facing materials.
-
-## 14. Example Generated Lesson Output
-
-### Lesson Topic
-
-Compassion in daily life.
-
-### Lesson Length
-
-90 minutes.
-
-### Teaching Anchor
-
-Guanyin Bodhisattva as a symbol of noticing suffering and responding with care.
-
-### Student Application
-
-How to respond when a classmate is excluded, teased, or upset.
-
-### Activities
-
-- Opening check-in: students choose from scenario cards showing everyday conflicts.
-- I do: educator models how to notice suffering, name the need, and choose one kind action.
-- We do: the class discusses one school-life scenario together.
-- You do: students role-play a school conflict and test different responses.
-- Reflection: students answer, "What suffering did I notice? What helpful response could I choose?"
-- Optional visual material: four comic-style panels showing a student choosing compassion during a school conflict.
-
-## 15. Success Metrics
-
-### Activation Metrics
-
-- Percentage of educators who start a voice planning session.
-- Percentage of educators who generate lesson options.
-- Percentage of educators who select an option.
-- Percentage of educators who generate a lesson brief.
-- Percentage of educators who generate a full lesson plan.
-- Percentage of educators who log at least one lesson reflection.
-
-### Engagement Metrics
-
-- Number of lesson plans generated per educator per month.
-- Number of lesson plans reused or adapted.
-- Number of reflections saved per educator per month.
-- Frequency of rehearsal coach usage before class.
-- Percentage of lesson plans influenced by prior lesson memory.
-- Number of visual packs generated when recommended.
-
-### Outcome Metrics
-
-- Educators can create a usable lesson plan in under 10 minutes.
-- Weekly preparation time is reduced by at least 50%.
-- Educators rate generated lessons as useful or very useful.
-- Educators report that generated 90-minute plans are easier to facilitate than generic AI-generated lesson plans.
-- Educators report increased confidence using self-directed learning.
-- Students can explain how a Buddhist teaching applies to daily life.
-
-### Quality Metrics
-
-- Percentage of generated lessons approved by educators without major rewrite.
-- Percentage of generated activities rated feasible for a class of four.
-- Percentage of generated visuals rated culturally appropriate by educators.
-- Number of content accuracy or sensitivity issues reported.
-- Percentage of generated plans that explicitly use relevant prior reflections when available.
-
-## 16. Risks And Mitigations
-
-### Risk: Doctrinal Inaccuracy Or Oversimplification
-
-Mitigation: Use curated source material, tradition labels, educator review, and cautious language when source confidence is limited.
-
-### Risk: Treating Buddhism As One Uniform Tradition
-
-Mitigation: Default to Chinese Mahayana folk Buddhism and explicitly label content by tradition.
-
-### Risk: Overreliance On AI In A Religious Education Setting
-
-Mitigation: Position the product as educator support. Require educator review and keep the educator as facilitator.
-
-### Risk: Unsupervised Student Interaction
-
-Mitigation: Keep realtime features educator-facing in MVP. Defer student-facing AI until there are stronger safety, consent, and supervision models.
-
-### Risk: Culturally Inappropriate Images
-
-Mitigation: Use respectful visual style presets, provide restricted image categories for sacred figures and rituals, and require educator review.
-
-### Risk: Self-Directed Learning Without Enough Scaffolding
-
-Mitigation: Use a clear framework, include checkpoints, provide educator facilitation notes, and adapt tasks for small classes.
-
-### Risk: 90-Minute Lessons Feel Too Long Or Repetitive
-
-Mitigation: Structure lessons with varied modes: short teaching, discussion, game, self-directed task, sharing, reflection, and optional extension activities.
-
-### Risk: Lesson Memory Contains Sensitive Student Information
-
-Mitigation: Keep the MVP educator-facing, avoid prompting for student full names, and define privacy, consent, retention, and deletion requirements before production storage.
-
-## 17. Rollout Plan
-
-### Phase 1: Preparation MVP
-
-- Voice-first lesson planning interview.
-- Typed brief fallback.
-- Lesson option generation and review.
-- Structured lesson brief generation.
-- Editable lesson output.
-- Full 90-minute lesson plan generation.
-- Play-based activity generation.
-- Scaffolded self-directed learning activities.
-- Educator rehearsal coach.
-- Visual pack generation when recommended.
-- Lesson memory through post-class reflection logging.
-
-### Phase 2: Quality And Source Layer
-
-- Curated Chinese Mahayana folk Buddhism content library.
-- Source-aware lesson generation.
-- Pedagogy reference rubric in generation and review.
-- Festival-based lesson packs.
-- Reusable lesson templates.
-- Educator ratings and feedback loop.
-
-### Phase 3: Class Memory And Live Support
-
-- Voice-based post-class reflection debriefs.
-- Multi-week class memory.
-- Educator-facing live facilitation copilot.
-- Multi-week curriculum planning.
-- Exportable lesson history.
-
-### Phase 4: Expansion
-
-- Additional Buddhist traditions.
-- Other subjects such as values education, culture, history, language learning, and character education.
-- Organization-level curriculum management.
-
-## 18. Open Questions
-
-- Which Chinese Mahayana folk Buddhist sources should be included in the first curated library?
-- Should the first version support English only, or English plus Chinese terms and explanations?
-- What level of source citation is expected by educators or temple leaders?
-- How much control should educators have over image style presets?
-- Should visual generation avoid sacred figures in MVP, or support them with stricter review?
-- What consent and privacy requirements apply if educator voice notes or class debriefs mention students?
-- What is the minimum viable export format: Markdown, PDF, Google Docs, printable worksheet, or slide deck?
-- Should the product be designed first for individual educators or temple education coordinators?
-- How much flexibility is needed for lessons shorter or longer than 90 minutes?
-- Which pedagogy references should be visible to educators, and which should remain behind the scenes as generation quality guidance?
-
-## 19. Launch Criteria
-
-- Educators can start with voice and generate lesson options.
-- Educators can compare options and select one without excessive scrolling.
-- Educators can generate and edit a full lesson plan in under 10 minutes.
-- Generated lesson plans default to a complete 90-minute structure.
-- Generated lessons consistently include play-based and scaffolded self-directed learning components.
-- Rehearsal coach produces realistic student questions and helpful simplifications.
-- Educators can log post-class reflection and see it influence future planning.
-- Content is clearly labeled as focused on Chinese Mahayana folk Buddhism.
-- Educator review is built into the workflow before classroom use.
-- No direct unsupervised student-agent interaction is available in MVP.
+| Decision | Who should resolve it | Evidence and timing |
+| --- | --- | --- |
+| Which teaching anchors and local practices need vetted references? | Product lead with participating educators and temple reviewers. | Catalogue recurring review concerns during the pilot; resolve before claiming source authority. |
+| Are English outputs with Chinese terms sufficient? | Product lead with target educators. | Observe explanation and material edits before committing to bilingual scope. |
+| Which edit/export step blocks classroom use? | Product/design lead. | Observe actual print-and-prepare tasks; choose a format based on use, not breadth. |
+| How well do age, class-size, and duration overrides work? | Product/engineering lead. | Test representative non-default cases before promising broader customization. |
+| Which sacred-image categories should be supported? | Product lead with temple reviewers. | Review real material requests; establish boundaries before expanding image presets. |
+| What data may be persisted or shared beyond the browser? | Product/engineering lead with privacy review. | Define consent, retention, deletion, and migration before adding accounts or sync. |
