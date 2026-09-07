@@ -100,7 +100,7 @@ Rules-based and deterministic behavior:
 
 ## How It Works
 
-The main planning flow starts in `src/App.tsx`. The frontend is organized as a streamlined educator-controlled planning workspace: a voice-first start card with a typed fallback, an explicit lesson-requirements review gate, and a main artifact workspace for options, lesson outlines, full lesson drafts, materials, practice, and reflection. The old right-side next-step panel was removed so the main workspace owns the current primary action.
+The main planning flow starts in `src/App.tsx`. The frontend uses a compact PlannerQ header, a centered paper-like workspace, forest-green primary controls, and readable document typography. The frontend is organized as a streamlined educator-controlled planning workspace: a voice-first start card with a typed fallback, an explicit lesson-requirements review gate, and a main artifact workspace for options, lesson outlines, full lesson drafts, materials, practice, and reflection. The entry card makes the review-before-drafting promise and default small-class context explicit, the voice session separates its visual microphone presence from the finish control to prevent accidental exits, and option cards emphasize the selected decision. Educators can start a fresh draft through a confirmation step without deleting saved classroom reflections. The old right-side next-step panel was removed so the main workspace owns the current primary action. The entry screen leads with the lesson outcome and offers three optional everyday-topic starters that fill the typed form for educator editing; they do not call an API or replace existing input. Progress appears after leaving entry, without shifting the form as the educator types. Completed options and outlines collapse into keyboard-accessible summaries as the next artifact is created, and generation moves keyboard focus to the new artifact. Required option-review concerns open automatically. Reset and option selection are disabled while requests run; regenerating a lesson clears its previous materials and practice. Saved reflections are available from a compact header action, with their full workspace deferred until requested or a lesson exists. The current visual layer is `src/workspace.css`, loaded after the existing styles to preserve earlier styling work.
 
 1. The educator enters a topic, objectives, and planning requirements, or starts a realtime voice planning session.
 2. The initial screen presents voice as the primary path using simple action copy: "Talk about it." The secondary path is "Type it out." The start card should invite the educator to share the topic, objectives, student needs, timing, and constraints without explaining unnecessary system mechanics.
@@ -119,7 +119,7 @@ Saved reflections are stored in browser `localStorage` under `lesson-planner-q-r
 
 The intended evolution is not to make every screen autonomous. Lesson Planner Q should remain a deterministic educator-controlled workflow, with specialized agents used where they improve planning quality: interviewing, drafting, critique, revision, rehearsal, and memory synthesis.
 
-The implemented slices include structured interview extraction plus server-side critic review and one-pass revision for lesson options, lesson briefs, and full lesson plans. The reflection memory agent should follow later.
+The implemented slices include structured interview extraction plus server-side critic review and one-pass revision for lesson options, lesson briefs, and full lesson plans. Reflection synthesis and typed rehearsal critique are also implemented; interactive voice rehearsal and a fully editable synthesized-memory workspace remain future work.
 
 The target agentic loop is:
 
@@ -141,19 +141,20 @@ The deterministic app shell should continue to own navigation, artifact state, s
 
 Agent roles:
 
-- Interview agent: turns voice or typed planning into structured context and clarifying questions. Future work.
+- Interview agent: gathers planning context by voice and extracts transcripts into editable requirements for approval. Implemented for voice; typed input uses the educator form directly.
 - Option agent: creates distinct lesson approaches and revises weak options after critique. Implemented for lesson options.
 - Pedagogy critic: checks whether play, visuals, self-directed learning, timeboxes, and classroom moves serve the lesson objective. Implemented for lesson options, lesson briefs, and full lesson plans.
 - Tradition reviewer: flags generic Buddhist framing, cultural flattening, doctrinal overclaiming, or places needing educator/temple review. Implemented for lesson options, lesson briefs, and full lesson plans.
 - Brief/plan agent: drafts the educator-reviewed brief and full lesson plan from the selected option and critique. Implemented for brief and full lesson plan revision.
-- Rehearsal agent: helps the educator practice likely student questions, simpler language, and difficult explanations. Current rehearsal route drafts coaching; live attempt critique remains future work.
-- Reflection memory agent: summarizes saved after-class reflections into inspectable classroom evidence for future planning. Future work.
+- Rehearsal agent: drafts likely questions and coaching, and critiques typed educator attempts. Implemented; interactive voice practice remains future work.
+- Reflection memory agent: summarizes saved after-class reflections into inspectable classroom evidence for future planning. Implemented; direct editing of synthesis remains future work.
 
 ## Important Files and Folders
 
 - `src/App.tsx`: main React application, planning workflow, realtime client flow, reflection memory UI, and API calls.
 - `src/types.ts`: TypeScript types for lesson plans, briefs, options, visual packs, and rehearsal output.
-- `src/styles.css`: application styling.
+- `src/styles.css`: existing application and print styling.
+- `src/workspace.css`: current educator-workspace design, responsive layout, and completed-stage disclosures; loaded after `styles.css`.
 - `server/index.mjs`: Express API server, OpenAI client setup, shared product instructions, JSON schemas, and route handlers.
 - `api/`: serverless-style API entrypoints/proxies for deployment environments.
 - `evals/`: local JSONL eval cases, deterministic graders, and a runner that exercises real API routes.
@@ -209,7 +210,7 @@ The runner imports the Express app, starts it on an ephemeral local port, sends 
 
 Current implementation priorities, in order:
 
-1. Polish the core weekly planning loop with real-classroom testing: voice or typed input, reviewed options, selected lesson outline, practice, full plan, material export, and reflection.
+1. Validate the core weekly planning loop with the pilot in the PRD: reviewed teachable plans, preparation effort, confidence, actual classroom use, and relevant reflection reuse. Treat time-saving targets as hypotheses, not measured benefits.
 2. Add editable document exports such as DOCX after the browser print/PDF path is stable.
 3. Upgrade rehearsal critique from typed attempts into an optional voice practice loop.
 4. Expand reflection memory synthesis into a more editable, inspectable memory workspace.
@@ -220,7 +221,8 @@ Current implementation priorities, in order:
 
 - Reflection memory is local to the browser, so it does not sync across devices.
 - Generated materials can be printed or saved as PDFs through the browser print dialog, but there is no generated binary PDF or editable document export yet.
-- There is no user account system or persistent database.
+- There is no user account system or persistent database; full lesson drafts do not survive a page refresh.
+- Dedicated class-profile controls and reliable validation of non-default lesson durations remain gaps; the educator can describe these needs in the requirements field.
 - There is a focused local eval harness, but no broader unit or browser test suite yet.
 - Cultural or doctrinal review still depends on educator judgment.
 

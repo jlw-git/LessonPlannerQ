@@ -1,0 +1,199 @@
+/* Educator workspace: a quiet paper surface, forest ink, and one next decision. */
+:root {
+  --page: #f8f9f6;
+  --paper: #ffffff;
+  --paper-soft: #f0f3ed;
+  --ink: #253d35;
+  --ink-soft: #53655d;
+  --muted: #637268;
+  --line: #dce3da;
+  --jade: #245c48;
+  --jade-strong: #194734;
+  --jade-soft: #edf4ee;
+}
+
+.teaching-workspace.app-shell {
+  display: block;
+  background: var(--page);
+  color: var(--ink);
+  width: 100%;
+  max-width: none;
+  overflow-x: clip;
+}
+
+.teaching-workspace button { font-weight: 600; }
+.teaching-workspace button:hover:not(:disabled) { transform: none; box-shadow: none; }
+.teaching-workspace button.primary { box-shadow: none; }
+.teaching-workspace p, .teaching-workspace li { font-size: 1rem; line-height: 1.65; }
+.teaching-workspace input, .teaching-workspace textarea, .teaching-workspace select { font-size: 1rem; font-weight: 400; }
+.teaching-workspace label { font-size: 0.9rem; font-weight: 600; }
+.teaching-workspace .section-eyebrow { color: var(--jade); font-size: 0.75rem; font-weight: 650; letter-spacing: 0.12em; text-transform: uppercase; }
+
+.skip-link { position: fixed; left: 16px; top: -100px; z-index: 20; padding: 12px 18px; background: white; color: var(--jade); }
+.skip-link:focus { top: 12px; }
+
+.app-shell.teaching-workspace .app-sidebar {
+  position: static;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  height: auto;
+  min-height: 86px;
+  padding: 18px max(28px, calc((100vw - 1160px) / 2));
+  background: white;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  overflow: visible;
+}
+
+.app-shell.teaching-workspace .brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  margin: 0;
+}
+.app-shell.teaching-workspace .brand-lockup strong { font-size: 1.35rem; font-weight: 700; max-width: none; letter-spacing: -0.04em; }
+.app-shell.teaching-workspace .brand-lockup > div { display: grid; gap: 3px; }
+.teaching-workspace .brand-caption { font-size: 0.75rem; color: var(--muted); }
+.teaching-workspace .brand-mark { height: 42px; width: 42px; border-radius: 13px; box-shadow: none; }
+.app-shell.teaching-workspace .sidebar-footer { display: block; border: 0; padding: 0; }
+.app-shell.teaching-workspace .sidebar-footer > span { font-size: 0.85rem; font-weight: 400; }
+.app-shell.teaching-workspace .sidebar-footer button { border: 0; background: transparent; font-size: 0.875rem; }
+
+.teaching-workspace .planner-workspace { width: 100%; max-width: 1216px; margin: 0 auto; overflow: visible; }
+.teaching-workspace .planner-grid { display: block; width: 100%; max-width: none; padding: 36px 28px 64px; }
+.teaching-workspace .planner-main { display: grid; gap: 20px; width: 100%; }
+.teaching-workspace .content { padding: 0; gap: 22px; }
+.teaching-workspace .content:empty { display: none; }
+.teaching-workspace .brief-composer.feature-section { display: grid; gap: 24px; background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 6px 0 0; width: 100%; max-width: none; }
+.teaching-workspace .composer-head { display: grid; gap: 12px; border: 0; padding: 0; }
+.teaching-workspace .composer-head h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: clamp(2.2rem, 4vw, 3.25rem); line-height: 1.1; letter-spacing: -0.04em; color: var(--ink); }
+.teaching-workspace .composer-head p { font-size: 1.05rem; margin: 0; color: var(--ink-soft); }
+.teaching-workspace .planning-context { gap: 10px 20px; padding: 0; margin: -7px 0 5px; }
+.teaching-workspace .planning-context span { background: transparent; border: 0; border-radius: 0; padding: 0; font-size: 0.8rem; font-weight: 400; gap: 6px; }
+.teaching-workspace .planning-context .tradition-context { font-weight: 500; }
+
+.teaching-workspace .entry-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: clamp(28px, 4vw, 56px); align-items: start; }
+.teaching-workspace .start-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0; }
+.teaching-workspace .voice-primary-card.mic-cta { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 30px; background: #244f3f; border: 1px solid #244f3f; border-radius: 18px; box-shadow: none; max-width: none; }
+.teaching-workspace .voice-cta-copy { display: grid; align-items: start; gap: 19px; }
+.teaching-workspace .voice-cta-copy > div { gap: 9px; }
+.teaching-workspace .voice-cta-icon { width: 52px; height: 52px; border-radius: 16px; background: #ffffff14; border: 1px solid #ffffff29; box-shadow: none; color: #f6f8f0; }
+.teaching-workspace .voice-cta-copy h2 { color: #fff; font-size: 1.4rem; letter-spacing: -0.025em; font-weight: 550; margin: 0; }
+.teaching-workspace .voice-cta-copy p { color: #d9e6dc; font-size: 0.97rem; line-height: 1.6; max-width: 450px; }
+.teaching-workspace .voice-start-button.primary { justify-self: start; width: auto; max-width: none; min-height: 48px; padding: 12px 20px; border: 0; border-radius: 8px; background: #f1f5df; color: #244734; font-size: 0.95rem; gap: 10px; box-shadow: none; }
+.teaching-workspace .voice-start-button.primary:hover:not(:disabled) { background: #fff; color: #244734; }
+.teaching-workspace .voice-primary-card .voice-review-note { font-size: 0.8rem; line-height: 1.45; color: #d9e6dc; margin: -8px 0 0; }
+.teaching-workspace .secondary-brief-card.typed-brief { padding: 0; border: 1px solid var(--line); border-radius: 12px; background: white; }
+.teaching-workspace .secondary-brief-card summary { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border: 0; border-radius: 12px; box-shadow: none; max-width: none; color: var(--ink); }
+.teaching-workspace .secondary-brief-card summary:hover { background: var(--paper-soft); max-width: none; }
+.teaching-workspace .secondary-brief-card summary::after { display: none; }
+.teaching-workspace .secondary-brief-card summary strong { font-size: 0.95rem; font-weight: 600; }
+.teaching-workspace .secondary-brief-card summary small { font-size: 0.8rem; font-weight: 400; color: var(--ink-soft); }
+.teaching-workspace .typed-chevron { margin-left: auto; flex-shrink: 0; }
+.teaching-workspace .secondary-brief-card[open] .typed-chevron { transform: rotate(180deg); }
+.teaching-workspace .typed-fallback-fields { padding: 5px 20px 20px; border: 0; background: white; border-radius: 12px; max-width: none; }
+.teaching-workspace .typed-actions { border: 0; margin: 0; padding-top: 5px; }
+
+.teaching-workspace .lesson-starters { padding: 12px 0 0; }
+.teaching-workspace .lesson-starters h2 { font-family: Georgia, "Times New Roman", serif; font-size: 1.65rem; font-weight: 400; line-height: 1.25; letter-spacing: -0.02em; margin: 13px 0 9px; max-width: 300px; }
+.teaching-workspace .lesson-starters > p { font-size: 0.9rem; color: var(--ink-soft); margin-bottom: 14px; }
+.teaching-workspace .starter-list { display: grid; }
+.teaching-workspace .starter-list button { display: flex; gap: 14px; justify-content: start; text-align: left; padding: 19px 2px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+.teaching-workspace .starter-list button:hover:not(:disabled) { background: #edf2e9; }
+.teaching-workspace .starter-list button:disabled { opacity: 0.55; }
+.teaching-workspace .starter-number { font-size: 0.75rem; font-weight: 400; color: #65775e; align-self: start; padding-top: 3px; }
+.teaching-workspace .starter-list button > span:nth-child(2) { display: grid; gap: 5px; flex: 1; }
+.teaching-workspace .starter-list strong { font-size: 0.92rem; font-weight: 550; line-height: 1.45; }
+.teaching-workspace .starter-list small { font-size: 0.8rem; font-weight: 400; line-height: 1.4; color: var(--ink-soft); }
+.teaching-workspace .starter-list svg { flex-shrink: 0; color: var(--jade); }
+.teaching-workspace .starter-footnote { display: block; color: var(--muted); font-size: 0.75rem; line-height: 1.5; margin-top: 16px; }
+.teaching-workspace .entry-outcomes { display: flex; flex-wrap: wrap; gap: 18px 30px; border-top: 1px solid var(--line); padding-top: 22px; margin-top: 6px; }
+.teaching-workspace .entry-outcomes span { display: inline-flex; align-items: center; gap: 9px; font-size: 0.85rem; color: var(--ink-soft); }
+.teaching-workspace .entry-outcomes svg { color: var(--jade); }
+
+.teaching-workspace .workflow-rail { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; width: auto; max-width: none; margin: 24px 28px 0; padding: 0 0 18px; border-bottom: 1px solid var(--line); overflow: visible; }
+.teaching-workspace .workflow-step { display: flex; gap: 8px; padding: 8px; border: 0; box-shadow: none; min-height: 40px; min-width: 0; background: transparent; border-radius: 8px; }
+.teaching-workspace .workflow-step:not(:last-child)::after { display: none; }
+.teaching-workspace .workflow-step strong { font-size: 0.8rem; font-weight: 500; }
+.teaching-workspace .workflow-step small { display: none; }
+.teaching-workspace .workflow-step.active { background: #e4eddf; }
+.teaching-workspace .workflow-marker { height: 24px; width: 24px; min-width: 24px; font-size: 0.75rem; }
+.teaching-workspace .fresh-start-action { padding: 0; margin: 0; }
+.teaching-workspace .fresh-start-action button { border: 0; background: transparent; font-size: 0.85rem; min-height: 36px; }
+.teaching-workspace .panel, .teaching-workspace .voice-stage { border: 1px solid var(--line); border-radius: 14px; background: white; box-shadow: none; padding: 28px; max-width: none; }
+.teaching-workspace .panel-heading { padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.teaching-workspace .panel-heading h2 { font-size: 1.4rem; line-height: 1.3; letter-spacing: -0.02em; }
+.teaching-workspace .artifact-stage, .teaching-workspace #lesson-stage { scroll-margin-top: 24px; min-width: 0; }
+.teaching-workspace .artifact-stage:focus, .teaching-workspace #lesson-stage:focus { outline: none; }
+.teaching-workspace .completed-stage { background: white; border: 1px solid var(--line); border-radius: 12px; }
+.teaching-workspace .completed-stage > summary { display: flex; align-items: center; gap: 12px; padding: 18px 20px; cursor: pointer; font-size: 0.9rem; list-style: none; }
+.teaching-workspace .completed-stage > summary::-webkit-details-marker { display: none; }
+.teaching-workspace .completed-stage > summary > svg { color: var(--jade); flex-shrink: 0; }
+.teaching-workspace .completed-stage > summary > span:first-of-type { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.teaching-workspace .stage-revisit { color: var(--ink-soft); font-size: 0.8rem; }
+.teaching-workspace .completed-stage[open] > summary { border-bottom: 1px solid var(--line); }
+.teaching-workspace .completed-stage[open] > summary > svg:last-child { transform: rotate(180deg); }
+.teaching-workspace .completed-stage > .panel { border: 0; }
+.teaching-workspace .option-picker { align-items: stretch; }
+.teaching-workspace .option-summary-card { background: #fbfcf9; box-shadow: none; border-radius: 12px; padding: 22px; }
+.teaching-workspace .option-summary-card.selected { background: #f0f6ed; border-color: var(--jade); box-shadow: inset 0 3px var(--jade); }
+.teaching-workspace .option-summary-card h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 1.45rem; }
+.teaching-workspace .option-card-actions { margin-top: auto; }
+.teaching-workspace .option-compare-list dt { font-size: 0.8rem; }
+.teaching-workspace .option-compare-list dd { font-size: 0.9rem; }
+.teaching-workspace .agent-review-panel { border-radius: 10px; box-shadow: none; }
+.teaching-workspace .agent-review-heading p { font-size: 0.9rem; }
+.teaching-workspace .lesson-document-header { padding-bottom: 22px; }
+.teaching-workspace .lesson-document-header h2 { font-family: Georgia, "Times New Roman", serif; font-size: 2rem; font-weight: 400; line-height: 1.2; }
+.teaching-workspace .lesson-draft-body h3 { font-size: 1.05rem; }
+.teaching-workspace .timeline article { border-radius: 8px; background: #f8faf6; box-shadow: none; }
+
+@media (max-width: 900px) {
+  .app-shell.teaching-workspace .app-sidebar { padding: 16px 24px; }
+  .teaching-workspace .entry-layout { gap: 28px; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
+  .teaching-workspace .voice-primary-card.mic-cta { padding: 24px; }
+  .teaching-workspace .voice-cta-copy h2 { font-size: 1.3rem; }
+  .teaching-workspace .workflow-rail { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .teaching-workspace .panel { padding: 22px; }
+  .teaching-workspace .voice-stage .voice-stage-center { grid-template-columns: auto minmax(0, 1fr); gap: 16px; }
+  .teaching-workspace .voice-stage .voice-stage-center > p { text-align: left; }
+  .teaching-workspace .voice-stage .mute-output-button, .teaching-workspace .voice-stage .end-session { width: 100%; min-width: 0; white-space: normal; }
+  .teaching-workspace .voice-stage .mute-output-button { grid-column: 1 / -1; }
+  .teaching-workspace .voice-stage .end-session { grid-column: 1 / -1; }
+}
+
+@media (max-width: 680px) {
+  .app-shell.teaching-workspace .app-sidebar { min-height: 76px; padding: 16px 20px; }
+  .teaching-workspace .brand-caption, .app-shell.teaching-workspace .sidebar-footer > span { display: none; }
+  .app-shell.teaching-workspace .brand-lockup strong { font-size: 1.25rem; }
+  .app-shell.teaching-workspace .sidebar-footer button { padding: 6px; font-size: 0.75rem; }
+  .teaching-workspace .planner-grid { padding: 30px 20px 40px; }
+  .teaching-workspace .composer-head { gap: 12px; }
+  .teaching-workspace .composer-head h1 { max-width: 330px; font-size: 2.55rem; }
+  .teaching-workspace .composer-head p { font-size: 1rem; }
+  .teaching-workspace .planning-context { gap: 12px 16px; margin: 0; }
+  .teaching-workspace .planning-context .tradition-context { flex-basis: 100%; line-height: 1.5; align-items: start; }
+  .teaching-workspace .planning-context .tradition-context svg { margin-top: 2px; }
+  .teaching-workspace .entry-layout { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .teaching-workspace .voice-start-button.primary { width: 100%; }
+  .teaching-workspace .lesson-starters { padding: 0; }
+  .teaching-workspace .lesson-starters h2 { max-width: none; }
+  .teaching-workspace .entry-outcomes { display: grid; gap: 16px; }
+  .teaching-workspace .workflow-rail { margin: 20px 20px 0; gap: 5px 0; }
+  .teaching-workspace .workflow-step { padding: 7px 4px; gap: 5px; }
+  .teaching-workspace .workflow-step strong { font-size: 0.72rem; overflow-wrap: anywhere; }
+  .teaching-workspace .panel, .teaching-workspace .voice-stage { padding: 18px; }
+  .teaching-workspace .completed-stage > summary { padding: 15px; gap: 8px; }
+  .teaching-workspace .stage-revisit { display: none; }
+  .teaching-workspace .lesson-document-header h2 { font-size: 1.65rem; }
+}
+
+@media print {
+  .app-shell.teaching-workspace .app-sidebar, .teaching-workspace .workflow-rail,
+  .teaching-workspace .fresh-start-action, .teaching-workspace .fresh-start-prompt,
+  .teaching-workspace .skip-link, .teaching-workspace .completed-stage { display: none !important; }
+}
